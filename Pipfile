@@ -1,0 +1,16 @@
+[[source]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+requests = ">=2.20.0"
+wget = "*"
+mutagen = "*"
+izen = {editable = true, path = "/Users/lihe/00Li/github/izen"}
+lxml = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.7"
