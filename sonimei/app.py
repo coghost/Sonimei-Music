@@ -22,7 +22,7 @@ from izen.prettify import ColorPrint, Prettify
 
 from sonimei.metas import Metas
 from sonimei.icfg import cfg
-from sonimei.zutil import fmt_help
+from sonimei.zutil import fmt_help, error_hint
 from sonimei.site_header import SonimeiHeaders, NeteaseHeaders
 
 SITES = {
@@ -182,6 +182,7 @@ class Sonimei(object):
             self.download(song['pic'], pic_pth)
         except Exception:
             zlog.error('failed {}'.format(song))
+            error_hint('maybe cache expired, use -nc to skip the cache')
             os._exit(-1)
         self.update_song(song, song_pth, pic_pth)
 
@@ -272,10 +273,7 @@ def local_existed(scan_mode, yt, name):
 def run(name, site, multiple, no_cache, log_level, scan_mode):
     """ a lovely script use sonimei search qq/netease songs """
     if not name and not scan_mode:
-        print()
-        empty_hints = '{0}>>> use -h for details <<<{0}'.format('' * 16)
-        click.secho(empty_hints, bg='blue', fg='white')
-        print()
+        error_hint('{0}>>> use -h for details <<<{0}'.format('' * 16))
         return
 
     # if scan_mode, will be all songs local
@@ -287,15 +285,16 @@ def run(name, site, multiple, no_cache, log_level, scan_mode):
         scanned_songs = yt.all_songs
 
     if not scanned_songs:
-        scanned_songs = [x for x in name.split('#')]
+        scanned_songs = [x for x in name.split('#') if x]
 
     for i, name in enumerate(scanned_songs):
         songs_store = {}
         page = 1
+        is_searched_from_site = False
         CP.F((PRETTY.symbols['right'] + ' ') * 2, 'processing/total: {}/{}'.format(i + 1, len(scanned_songs)))
 
         while True:
-            if page == 1 and local_existed(scan_mode, yt, name):
+            if not is_searched_from_site and local_existed(scan_mode, yt, name):
                 CP.G(PRETTY.symbols['end'], 'quit')
                 break
 
@@ -309,6 +308,8 @@ def run(name, site, multiple, no_cache, log_level, scan_mode):
                 zlog.info('from sonimei try: {}/{}/{}'.format(name, site, page))
                 songs = yt.search_it(name, page=page)
                 songs_store[page] = songs
+
+            is_searched_from_site = True
             song_info = [x['author'] + '-' + x['title'] for x in songs]
 
             c = helper.num_choice(

@@ -7,7 +7,7 @@ __description__ = '''
 
 from setuptools import setup, find_packages
 
-VERSION = '0.1'
+VERSION = '0.1.5'
 
 setup(
     name='sonimei',
@@ -23,12 +23,20 @@ setup(
     long_description_content_type="text/markdown",
     license='GPL',
     install_requires=[
-        'wget', 'izen', 'click', 'logzero', 'mutagen', 'lxml'],
-
+        'wget', 'izen', 'click', 'logzero', 'mutagen', 'lxml'
+    ],
     entry_points={
         'console_scripts': [
             'snmcli = sonimei:start'
         ],
     },
+    project_urls={
+        'Bug Reports': 'https://github.com/coghost/Sonimei-Music/issues',
+        'Source': 'https://github.com/coghost/Sonimei-Music',
+    },
+    python_requires='>=3.7',
+    classifiers=[
+        'Programming Language :: Python :: 3.7',
+    ],
     keywords=['sonimei', 'music downloader']
 )
