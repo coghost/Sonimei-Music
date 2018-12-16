@@ -9,6 +9,7 @@ import sys
 import json
 from urllib.parse import urljoin, urlencode, quote
 import re
+import traceback
 
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
@@ -180,9 +181,11 @@ class Sonimei(object):
         try:
             self.download(song['url'], song_pth)
             self.download(song['pic'], pic_pth)
-        except Exception:
+        except Exception as ex:
             zlog.error('failed {}'.format(song))
             error_hint('maybe cache expired, use -nc to skip the cache')
+
+            traceback.print_exc()
             os._exit(-1)
         self.update_song(song, song_pth, pic_pth)
 
