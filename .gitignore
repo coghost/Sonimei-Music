@@ -3,6 +3,8 @@
 */*.json
 */*.cnf
 */*.png
+*.lock
+Pipfile*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

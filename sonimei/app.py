@@ -179,6 +179,9 @@ class Sonimei(object):
         song_pth = os.path.join(self.save_dir, '{}.{}'.format(title, extension))
         pic_pth = os.path.join(self.ac.cache['site_media'], title + '.jpg')
         try:
+            if not song.get('url'):
+                zlog.warning('song has no url: {}'.format(song))
+                return
             self.download(song['url'], song_pth)
             self.download(song['pic'], pic_pth)
         except Exception as ex:
