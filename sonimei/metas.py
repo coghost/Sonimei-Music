@@ -6,7 +6,6 @@ mutagen
 '''
 import os
 import sys
-from pprint import pprint
 
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
@@ -18,7 +17,7 @@ from izen.helper import R, B, G
 from izen.prettify import ColorPrint
 
 
-class Metas(object):
+class SongMetas(object):
     def __init__(self, silent_handle=False):
         self.CP = ColorPrint(silent_handle)
 
@@ -66,6 +65,8 @@ class Metas(object):
         for k, v in song.items():
             if 'APIC' not in k:
                 self.CP.W(k, v)
-        self.CP.G('update done: size from {} to {}, pic took {}'.format(before_update_size, after_size,
-                                                                        after_size - before_update_size))
+        self.CP.G('update done: size from {} to {}, pic took {}'.format(
+            before_update_size, after_size,
+            after_size - before_update_size)
+        )
         self.CP.C('-' * 32)

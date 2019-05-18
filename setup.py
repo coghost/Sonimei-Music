@@ -23,7 +23,7 @@ setup(
     long_description_content_type="text/markdown",
     license='GPL',
     install_requires=[
-        'wget', 'izen', 'click', 'logzero', 'mutagen', 'lxml'
+        'wget', 'izen', 'click', 'logzero', 'mutagen', 'lxml', 'requests'
     ],
     entry_points={
         'console_scripts': [

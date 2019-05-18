@@ -7,25 +7,26 @@ __description__ = '''
 import os
 import sys
 import json
-from urllib.parse import urljoin, urlencode, quote
+from urllib.parse import urljoin
 import re
 import traceback
 
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
-import wget
 import click
 import requests
 from logzero import logger as zlog
-from izen.crawler import AsyncCrawler, UA
-from izen import helper, crawler
+from izen.crawler import AsyncCrawler
+from izen import helper
 from izen.prettify import ColorPrint, Prettify
 
-from sonimei.metas import Metas
+from sonimei.metas import SongMetas
 from sonimei.icfg import cfg
 from sonimei.zutil import fmt_help, error_hint
-from sonimei.site_header import SonimeiHeaders, NeteaseHeaders
+from sonimei.site_header import SonimeiHeaders
+from sonimei.sites import Netease
+from sonimei import wget
 
 SITES = {
     'qq': 'qq',
@@ -35,26 +36,8 @@ PRETTY = Prettify(cfg)
 CP = ColorPrint()
 
 
-class NE(object):
-    def __init__(self, log_level=10):
-        self.home = 'https://music.163.com/'
-        self.ac = AsyncCrawler(
-            site_init_url=self.home,
-            base_dir=os.path.expanduser('~/.crawler'),
-            timeout=10,
-            log_level=log_level,
-        )
-        self.ac.headers['get'] = NeteaseHeaders.get
-
-    def do_get(self, url):
-        doc = self.ac.bs4get(url)
-        album_doc = doc.find_all(class_='des s-fc4')[-1]
-        album = album_doc.a.text
-        return album
-
-
 class Sonimei(object):
-    def __init__(self, site='qq', use_cache=True, log_level=10, timeout=10):
+    def __init__(self, site='qq', use_cache=True, log_level=10, timeout=10, override=False):
         self.home = 'http://music.sonimei.cn/'
         self.ac = AsyncCrawler(
             site_init_url=self.home,
@@ -62,14 +45,16 @@ class Sonimei(object):
             timeout=timeout,
             log_level=log_level,
         )
+        self.ac.headers['post'] = SonimeiHeaders.post
+
         self.use_cache = use_cache
         if site == 'netease':
-            self.site_netease = NE(log_level)
-        self.ac.headers['post'] = SonimeiHeaders.post
+            self.site_netease = Netease(log_level)
         self.site = site
         self.save_dir = os.path.expanduser(cfg.get('snm.save_dir', '~/Music/sonimei'))
-        self.log_level = log_level
         self.all_songs = []
+        self._song_metas = SongMetas(log_level <= 10)
+        self._override = override
         self._spawn()
 
     def _spawn(self):
@@ -83,7 +68,7 @@ class Sonimei(object):
             song_pth += '.mp3'
 
         if helper.is_file_ok(song_pth):
-            has_pic, song_id3 = Metas(True).get_song_meta(song_pth)
+            has_pic, song_id3 = self._song_metas.get_song_meta(song_pth)
             return has_pic, song_pth
         return False, None
 
@@ -167,9 +152,8 @@ class Sonimei(object):
         detail = json.loads(rs[1].strip()[:-1])
         return detail['albumname']
 
-    @staticmethod
-    def download(src, save_to):
-        if helper.is_file_ok(save_to):
+    def download(self, src, save_to):
+        if not self._override and helper.is_file_ok(save_to):
             zlog.debug('{} is downloaded.'.format(save_to))
         else:
             zlog.debug('try get {}'.format(save_to))
@@ -200,7 +184,7 @@ class Sonimei(object):
     def update_song(self, song, song_pth, pic_pth):
         tags = ['TIT2', 'TPE1', 'TALB']
         site_dat = {'TPE1': song['author'].strip(), 'TIT2': song['title'].strip()}
-        has_pic, song_id3 = Metas(self.log_level <= 10).get_song_meta(song_pth)
+        has_pic, song_id3 = self._song_metas.get_song_meta(song_pth)
 
         id3_same = True
         # skip TALB
@@ -218,7 +202,7 @@ class Sonimei(object):
 
         if not id3_same:
             CP.G('update {}'.format(site_dat))
-            Metas(self.log_level <= 10).update_song_meta(song_pth, site_dat)
+            self._song_metas.update_song_meta(song_pth, site_dat)
 
     def scan_all_songs(self):
         self.all_songs = helper.walk_dir_with_filter(self.save_dir, prefix=['.DS_Store'])
@@ -262,27 +246,30 @@ def local_existed(scan_mode, yt, name):
         terminal_width=200,
     ),
 )
+@click.option('--force_mode', '-f',
+              is_flag=True, default=False,
+              help=fmt_help('force override local file', '-f'))
+@click.option('--log_level', '-l',
+              default=2, type=click.IntRange(1, 5),
+              help=fmt_help('set log level', '-l <1~5>\n1=Debug,2=Info,3=Warn,4=Error,5=Fatal'))
+@click.option('--multiple', '-m',
+              is_flag=True,
+              help=fmt_help('download multiple songs', '-m'))
 @click.option('--name', '-n',
               help=fmt_help('the name of song/songs', '-n <song1#song2#...>'))
+@click.option('--no_cache', '-nc',
+              is_flag=True,
+              help=fmt_help('use no cache', '-nc'))
 @click.option('--site', '-s',
               default='qq',
               type=click.Choice(['qq', 'netease']),
               help=fmt_help('the song source site', '-s <qq/netease>'))
-@click.option('--multiple', '-m',
-              is_flag=True,
-              help=fmt_help('download multiple songs', '-m'))
-@click.option('--timeout', '-to', type=int, show_default=True)
-@click.option('--no_cache', '-nc',
-              is_flag=True,
-              help=fmt_help('use no cache', '-nc'))
-@click.option('--log_level', '-l',
-              default=2,
-              type=click.IntRange(1, 5),
-              help=fmt_help('set log level', '-l <1~5>\n1=Debug,2=Info,3=Warn,4=Error,5=Fatal'))
 @click.option('--scan_mode', '-scan',
               is_flag=True,
               help=fmt_help('scan all songs and add id3 info', '-scan'))
-def run(name, site, multiple, no_cache, log_level, scan_mode, timeout):
+@click.option('--timeout', '-to', type=int,
+              help=fmt_help('default timeout', '-to'))
+def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mode):
     """ a lovely script use sonimei search qq/netease songs """
     if not name and not scan_mode:
         error_hint('{0}>>> use -h for details <<<{0}'.format('' * 16))
@@ -292,7 +279,7 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout):
     # else will be the name passed in
     scanned_songs = []
     timeout = timeout or cfg.get('snm.timeout')
-    yt = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout)
+    yt = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout, override=force_mode)
 
     if scan_mode:
         scanned_songs = yt.all_songs

@@ -21,6 +21,7 @@ cfg = Conf(
         'pretty.symbols': ' ,,,, ,,,,,,,,ﴖ,,,,,,,♪,',
         'snm.save_dir': '~/Music/sonimei',
         'snm.timeout': 15,
+        'snm.progress_symbol': '.',
     },
 ).cfg
 
