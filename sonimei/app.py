@@ -23,11 +23,11 @@ PRETTY = Prettify(cfg)
 CP = ColorPrint()
 
 
-def local_existed(scan_mode, yt, name):
+def local_existed(scan_mode, client, name):
     """judge if found from local, only press ``s`` will go next"""
     if not scan_mode:
-        yt.scan_all_songs()
-        cache = yt.is_file_exist(name)
+        client.scan_all_songs()
+        cache = client.is_file_exist(name)
         if cache:
             CP.G('Found from local, still want search and download???')
             CP.R('press s to skip local, and re-download, or other key to exit')

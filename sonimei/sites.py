@@ -34,6 +34,55 @@ from izen.crawler import AsyncCrawler
 from sonimei.site_header import NeteaseHeaders
 
 
+class MusicAdmin(object):
+    pass
+
+
+class Downloader(object):
+    def __init__(self, dst_dir, cache_dir, override=False):
+        self._override = override
+        self._media_dst_dir = dst_dir
+        self._media_cache_dir = cache_dir
+
+    @staticmethod
+    def _parse_song(dat):
+        if isinstance(dat, str):
+            dat = json.loads(dat)
+        url = dat.get('url')
+        zlog.info('song url: [{}]'.format(url))
+        return 'mp3'
+
+    def _download(self, src, save_to):
+        if not self._override and helper.is_file_ok(save_to):
+            zlog.debug('{} is downloaded.'.format(save_to))
+        else:
+            zlog.debug('try get {}'.format(save_to))
+            wget.download(src, out=save_to)
+            # wget output end without new line
+            print()
+            zlog.info('downloaded {}'.format(helper.G.format(save_to)))
+
+    def save_song(self, song):
+        extension = self._parse_song(song)
+        title = song['author'] + '-' + song['title']
+        song_pth = os.path.join(self._media_dst_dir, '{}.{}'.format(title, extension))
+        pic_pth = os.path.join(self._media_cache_dir, title + '.jpg')
+        try:
+            if not song.get('url'):
+                zlog.warning('song has no url: {}'.format(song))
+                return
+            self._download(song['url'], song_pth)
+            self._download(song['pic'], pic_pth)
+            return song, song_pth, pic_pth
+        except Exception as ex:
+            zlog.error('failed {}'.format(song))
+            error_hint('maybe cache expired, use -nc to skip the cache')
+
+            traceback.print_exc()
+            os._exit(-1)
+        # self.update_song(song, song_pth, pic_pth)
+
+
 class Sonimei(object):
     def __init__(self, site='qq', use_cache=True, log_level=10, timeout=10, override=False):
         self.home = 'http://music.sonimei.cn/'
@@ -43,22 +92,28 @@ class Sonimei(object):
             timeout=timeout,
             log_level=log_level,
         )
-        self.ac.headers['post'] = SonimeiHeaders.post
-
         self.use_cache = use_cache
+
         if site == 'netease':
-            self.site_netease = Netease(log_level)
+            self.site_netease = NeteaseAlbum(log_level)
         self.site = site
+
         self.save_dir = os.path.expanduser(cfg.get('snm.save_dir', '~/Music/sonimei'))
-        self.all_songs = []
+        self._all_songs = []
         self._song_metas = SongMetas(log_level <= 10)
         self._override = override
+        self._downloader = Downloader(self.save_dir, self.ac.cache['site_media'], override)
         self._spawn()
 
     def _spawn(self):
+        self.ac.headers['post'] = SonimeiHeaders.post
         self.ac.headers['Host'] = self.ac.domain
         helper.mkdir_p(self.save_dir, is_dir=True)
         self.scan_all_songs()
+
+    @property
+    def all_songs(self):
+        return self._all_songs
 
     def is_file_id3_ok(self, song_name):
         song_pth = os.path.join(self.save_dir, song_name)
@@ -150,33 +205,8 @@ class Sonimei(object):
         detail = json.loads(rs[1].strip()[:-1])
         return detail['albumname']
 
-    def download(self, src, save_to):
-        if not self._override and helper.is_file_ok(save_to):
-            zlog.debug('{} is downloaded.'.format(save_to))
-        else:
-            zlog.debug('try get {}'.format(save_to))
-            wget.download(src, out=save_to)
-            # wget output end without new line
-            print()
-            zlog.info('downloaded {}'.format(helper.G.format(save_to)))
-
     def save_song(self, song):
-        extension = self.parse_song(song)
-        title = song['author'] + '-' + song['title']
-        song_pth = os.path.join(self.save_dir, '{}.{}'.format(title, extension))
-        pic_pth = os.path.join(self.ac.cache['site_media'], title + '.jpg')
-        try:
-            if not song.get('url'):
-                zlog.warning('song has no url: {}'.format(song))
-                return
-            self.download(song['url'], song_pth)
-            self.download(song['pic'], pic_pth)
-        except Exception as ex:
-            zlog.error('failed {}'.format(song))
-            error_hint('maybe cache expired, use -nc to skip the cache')
-
-            traceback.print_exc()
-            os._exit(-1)
+        song, song_pth, pic_pth = self._downloader.save_song(song)
         self.update_song(song, song_pth, pic_pth)
 
     def update_song(self, song, song_pth, pic_pth):
@@ -203,15 +233,15 @@ class Sonimei(object):
             self._song_metas.update_song_meta(song_pth, site_dat)
 
     def scan_all_songs(self):
-        self.all_songs = helper.walk_dir_with_filter(self.save_dir, prefix=['.DS_Store'])
-        self.all_songs = [x.split('/')[-1] for x in self.all_songs]
+        self._all_songs = helper.walk_dir_with_filter(self.save_dir, prefix=['.DS_Store'])
+        self._all_songs = [x.split('/')[-1] for x in self._all_songs]
 
     def is_file_exist(self, song_name):
         """TODO: use sqlite to store song names"""
         song_name = song_name.split('-')[-1].split('.')[0]
         # print(song_name, local_musics)
         similar = []
-        for song in self.all_songs:
+        for song in self._all_songs:
             song_ = '.'.join(song.split('.')[:-1])
             candidates = [song_, *song_.split('-')]
             if song_name in '#'.join(candidates):
@@ -220,7 +250,7 @@ class Sonimei(object):
         return similar
 
 
-class Netease(object):
+class NeteaseAlbum(object):
     def __init__(self, log_level=10):
         self.home = 'https://music.163.com/'
         self.ac = AsyncCrawler(
