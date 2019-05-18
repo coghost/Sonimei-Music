@@ -16,6 +16,7 @@ sys.path.append(app_root)
 
 import wget
 import click
+import requests
 from logzero import logger as zlog
 from izen.crawler import AsyncCrawler, UA
 from izen import helper, crawler
@@ -53,12 +54,12 @@ class NE(object):
 
 
 class Sonimei(object):
-    def __init__(self, site='qq', use_cache=True, log_level=10):
+    def __init__(self, site='qq', use_cache=True, log_level=10, timeout=10):
         self.home = 'http://music.sonimei.cn/'
         self.ac = AsyncCrawler(
             site_init_url=self.home,
             base_dir=os.path.expanduser('~/.crawler'),
-            timeout=10,
+            timeout=timeout,
             log_level=log_level,
         )
         self.use_cache = use_cache
@@ -117,8 +118,12 @@ class Sonimei(object):
             'page': page,
             'input': name,
         }
-        doc = self.ac.bs4post(self.home, data=form, show_log=True, use_cache=self.use_cache)
-        songs = doc['data']
+        doc = {}
+        try:
+            doc = self.ac.bs4post(self.home, data=form, show_log=True, use_cache=self.use_cache)
+        except requests.exceptions.ReadTimeout as e:
+            zlog.error('ReadTimeout: {}'.format(e))
+        songs = doc.get('data')
         if not songs:
             zlog.warning('[{}] matched nothing.'.format(name))
             os._exit(0)
@@ -266,6 +271,7 @@ def local_existed(scan_mode, yt, name):
 @click.option('--multiple', '-m',
               is_flag=True,
               help=fmt_help('download multiple songs', '-m'))
+@click.option('--timeout', '-to', default=10, type=int, show_default=True)
 @click.option('--no_cache', '-nc',
               is_flag=True,
               help=fmt_help('use no cache', '-nc'))
@@ -276,7 +282,7 @@ def local_existed(scan_mode, yt, name):
 @click.option('--scan_mode', '-scan',
               is_flag=True,
               help=fmt_help('scan all songs and add id3 info', '-scan'))
-def run(name, site, multiple, no_cache, log_level, scan_mode):
+def run(name, site, multiple, no_cache, log_level, scan_mode, timeout):
     """ a lovely script use sonimei search qq/netease songs """
     if not name and not scan_mode:
         error_hint('{0}>>> use -h for details <<<{0}'.format('' * 16))
@@ -285,7 +291,7 @@ def run(name, site, multiple, no_cache, log_level, scan_mode):
     # if scan_mode, will be all songs local
     # else will be the name passed in
     scanned_songs = []
-    yt = Sonimei(site, not no_cache, log_level=log_level * 10)
+    yt = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout)
 
     if scan_mode:
         scanned_songs = yt.all_songs
