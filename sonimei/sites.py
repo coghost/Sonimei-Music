@@ -31,7 +31,7 @@ PRETTY = Prettify(cfg)
 CP = ColorPrint()
 
 from izen.crawler import AsyncCrawler
-from sonimei.site_header import NeteaseHeaders
+from sonimei.site_header import NeteaseHeaders, QQHeaders
 
 
 class MusicAdmin(object):
@@ -83,6 +83,69 @@ class Downloader(object):
         # self.update_song(song, song_pth, pic_pth)
 
 
+class QQAlbum(object):
+    def __init__(self, log_level=10, use_cache=True):
+        self.home = 'http://y.qq.com/'
+        self.ac = AsyncCrawler(
+            site_init_url=self.home,
+            base_dir=os.path.expanduser('~/.crawler'),
+            timeout=10,
+            log_level=log_level,
+        )
+        self.ac.headers['get'] = QQHeaders.get
+        self._use_cache = use_cache
+
+    def get_album(self, dat):
+        """
+        Args:
+            dat (dict):
+            {
+                'type': 'qq',
+                'link': 'http://y.qq.com/n/yqq/song/0019n6dS204TzZ.html',
+                'songid': '0019n6dS204TzZ',
+                'title': '有一种悲伤',
+                'author': 'A-Lin',
+                'lrc': '...',
+                'url': 'http://dl.stream.qqmusic.qq.com/M5000019n6dS204TzZ.mp3?vkey=A08C2C65EF31C4AB117D2F4C06CA2F187EDE6DFC8769C93E2CB1DE30C5A3860E5360CD3A80E92ADE893AD5B4F46211E8B1F66136443979D7&guid=5150825362&fromtag=1',
+                'pic': 'http://y.gtimg.cn/music/photo_new/T002R300x300M0000030IgT80txlIK.jpg'
+            }
+        Returns:
+            album (str)
+        """
+        doc = self.ac.bs4get(dat['link'], use_cache=self._use_cache)
+        _pg = re.compile('g_SongData = *')
+        rs = doc.find(string=_pg)
+        rs = rs.split(' = ')
+        detail = json.loads(rs[1].strip()[:-1])
+        return detail['albumname']
+
+
+class NeteaseAlbum(object):
+    def __init__(self, log_level=10, use_cache=True):
+        self.home = 'https://music.163.com/'
+        self.ac = AsyncCrawler(
+            site_init_url=self.home,
+            base_dir=os.path.expanduser('~/.crawler'),
+            timeout=10,
+            log_level=log_level,
+        )
+        self.ac.headers['get'] = NeteaseHeaders.get
+        self._use_cache = use_cache
+
+    def _do_get(self, url):
+        doc = self.ac.bs4get(url)
+        album_doc = doc.find_all(class_='des s-fc4')[-1]
+        album = album_doc.a.text
+        return album
+
+    def get_album(self, dat):
+        link = urljoin(self.home, dat['link'].split('#')[1])
+        doc = self.ac.bs4get(link, use_cache=self._use_cache)
+        album_doc = doc.find_all(class_='des s-fc4')[-1]
+        album = album_doc.a.text
+        return album
+
+
 class Sonimei(object):
     def __init__(self, site='qq', use_cache=True, log_level=10, timeout=10, override=False):
         self.home = 'http://music.sonimei.cn/'
@@ -94,9 +157,12 @@ class Sonimei(object):
         )
         self.use_cache = use_cache
 
-        if site == 'netease':
-            self.site_netease = NeteaseAlbum(log_level)
         self.site = site
+
+        if site == 'qq':
+            self._album_handler = QQAlbum(log_level, use_cache)
+        else:
+            self._album_handler = NeteaseAlbum(log_level, use_cache)
 
         self.save_dir = os.path.expanduser(cfg.get('snm.save_dir', '~/Music/sonimei'))
         self._all_songs = []
@@ -181,30 +247,6 @@ class Sonimei(object):
             song_extension = 'mp3'
         return song_extension
 
-    def get_song_album(self, dat):
-        """
-        TALB
-        """
-        if self.site == 'qq':
-            return self.get_qq_album(dat)
-        elif self.site == 'netease':
-            return self.get_netease_album(dat)
-        else:
-            return ''
-
-    def get_netease_album(self, dat):
-        link = urljoin('https://music.163.com', dat['link'].split('#')[1])
-        album = self.site_netease.do_get(link)
-        return album
-
-    def get_qq_album(self, dat):
-        doc = self.ac.bs4get(dat['link'], use_cache=self.use_cache)
-        _pg = re.compile('g_SongData = *')
-        rs = doc.find(string=_pg)
-        rs = rs.split(' = ')
-        detail = json.loads(rs[1].strip()[:-1])
-        return detail['albumname']
-
     def save_song(self, song):
         song, song_pth, pic_pth = self._downloader.save_song(song)
         self.update_song(song, song_pth, pic_pth)
@@ -226,7 +268,7 @@ class Sonimei(object):
             id3_same = False
 
         if not song_id3.get('TALB') or not id3_same:
-            site_dat['TALB'] = self.get_song_album(song)
+            site_dat['TALB'] = self._album_handler.get_album(song)
 
         if not id3_same:
             CP.G('update {}'.format(site_dat))
@@ -248,21 +290,3 @@ class Sonimei(object):
                 similar.append(song)
 
         return similar
-
-
-class NeteaseAlbum(object):
-    def __init__(self, log_level=10):
-        self.home = 'https://music.163.com/'
-        self.ac = AsyncCrawler(
-            site_init_url=self.home,
-            base_dir=os.path.expanduser('~/.crawler'),
-            timeout=10,
-            log_level=log_level,
-        )
-        self.ac.headers['get'] = NeteaseHeaders.get
-
-    def do_get(self, url):
-        doc = self.ac.bs4get(url)
-        album_doc = doc.find_all(class_='des s-fc4')[-1]
-        album = album_doc.a.text
-        return album

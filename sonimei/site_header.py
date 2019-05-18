@@ -66,3 +66,19 @@ class NeteaseHeaders(Headers):
     """
     get: dict = ParseHeaderFromFile(raw=__get_raw__).headers
     post: dict = ParseHeaderFromFile(raw=__post_raw__).headers
+
+
+class QQHeaders(Headers):
+    __get_raw__ = """
+    Host: y.qq.com
+    User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+    Accept-Language: en-US,zh-CN;q=0.8,zh;q=0.7,zh-TW;q=0.5,zh-HK;q=0.3,en;q=0.2
+    Accept-Encoding: gzip, deflate, br
+    Connection: keep-alive
+    Cookie: yqq_stat=0; pgv_info=ssid=s7188190737; ts_last=y.qq.com/n/yqq/song/0019n6dS204TzZ.html; pgv_pvid=5820260362; ts_uid=5769688544; pgv_pvi=8737058816; pgv_si=s4310818816
+    Upgrade-Insecure-Requests: 1
+    Pragma: no-cache
+    Cache-Control: no-cache
+    """
+    get: dict = ParseHeaderFromFile(raw=__get_raw__).headers
