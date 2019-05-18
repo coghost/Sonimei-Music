@@ -271,7 +271,7 @@ def local_existed(scan_mode, yt, name):
 @click.option('--multiple', '-m',
               is_flag=True,
               help=fmt_help('download multiple songs', '-m'))
-@click.option('--timeout', '-to', default=10, type=int, show_default=True)
+@click.option('--timeout', '-to', type=int, show_default=True)
 @click.option('--no_cache', '-nc',
               is_flag=True,
               help=fmt_help('use no cache', '-nc'))
@@ -291,6 +291,7 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout):
     # if scan_mode, will be all songs local
     # else will be the name passed in
     scanned_songs = []
+    timeout = timeout or cfg.get('snm.timeout')
     yt = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout)
 
     if scan_mode:

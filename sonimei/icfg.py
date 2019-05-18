@@ -20,6 +20,7 @@ cfg = Conf(
     dat={
         'pretty.symbols': ' ,,,, ,,,,,,,,ﴖ,,,,,,,♪,',
         'snm.save_dir': '~/Music/sonimei',
+        'snm.timeout': 15,
     },
 ).cfg
 
