@@ -83,7 +83,7 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mod
     _client = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout, override=force_mode)
 
     if scan_mode:
-        scanned_songs = _client.all_songs
+        scanned_songs = _client.store.all_songs
 
     if not scanned_songs:
         scanned_songs = [x for x in name.split('#') if x]
@@ -95,11 +95,11 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mod
         CP.F((PRETTY.symbols['right'] + ' ') * 2, 'processing/total: {}/{}'.format(i + 1, len(scanned_songs)))
 
         while True:
-            if not is_searched_from_site and local_existed(scan_mode, _client, name):
+            if not is_searched_from_site and local_existed(scan_mode, _client.store, name):
                 CP.G(PRETTY.symbols['end'], 'quit')
                 break
 
-            status, song_pth = _client.is_file_id3_ok(name)
+            status, song_pth = _client.store.is_file_id3_ok(name)
             if status:
                 CP.G(PRETTY.symbols['music'], '[{}] is found and updated'.format(song_pth))
                 break

@@ -34,8 +34,65 @@ from izen.crawler import AsyncCrawler
 from sonimei.site_header import NeteaseHeaders, QQHeaders
 
 
-class MusicAdmin(object):
-    pass
+class MusicStore(object):
+    def __init__(self, song_dir, log_level=10):
+        self._music_dir = song_dir
+        self._all_songs = []
+        self._song_metas = SongMetas(log_level <= 10)
+
+    @property
+    def all_songs(self):
+        return self._all_songs
+
+    def scan_all_songs(self):
+        self._all_songs = helper.walk_dir_with_filter(self._music_dir, prefix=['.DS_Store'])
+        self._all_songs = [x.split('/')[-1] for x in self._all_songs]
+
+    def is_file_exist(self, song_name):
+        """TODO: use sqlite to store song names"""
+        song_name = song_name.split('-')[-1].split('.')[0]
+        # print(song_name, local_musics)
+        similar = []
+        for song in self._all_songs:
+            song_ = '.'.join(song.split('.')[:-1])
+            candidates = [song_, *song_.split('-')]
+            if song_name in '#'.join(candidates):
+                similar.append(song)
+
+        return similar
+
+    def is_file_id3_ok(self, song_name):
+        song_pth = os.path.join(self._music_dir, song_name)
+        if song_pth[-4:] != '.mp3':
+            song_pth += '.mp3'
+
+        if helper.is_file_ok(song_pth):
+            has_pic, song_id3 = self._song_metas.get_song_meta(song_pth)
+            return has_pic, song_pth
+        return False, None
+
+    def update_song(self, song, song_pth, pic_pth, album_info):
+        tags = ['TIT2', 'TPE1', 'TALB']
+        site_dat = {'TPE1': song['author'].strip(), 'TIT2': song['title'].strip()}
+        has_pic, song_id3 = self._song_metas.get_song_meta(song_pth)
+
+        id3_same = True
+        # skip TALB
+        for tag in tags[:-1]:
+            if site_dat[tag] != song_id3.get(tag):
+                zlog.debug('Not Matched: site({}) != id3({})'.format(site_dat[tag], song_id3.get(tag)))
+                id3_same = False
+                # id3_same = id3_same and site_dat[tag] == song_id3[tag]
+        if not has_pic:
+            site_dat['APIC'] = pic_pth
+            id3_same = False
+
+        if not song_id3.get('TALB') or not id3_same:
+            site_dat['TALB'] = album_info
+
+        if not id3_same:
+            CP.G('update {}'.format(site_dat))
+            self._song_metas.update_song_meta(song_pth, site_dat)
 
 
 class Downloader(object):
@@ -74,13 +131,12 @@ class Downloader(object):
             self._download(song['url'], song_pth)
             self._download(song['pic'], pic_pth)
             return song, song_pth, pic_pth
-        except Exception as ex:
+        except Exception:
             zlog.error('failed {}'.format(song))
             error_hint('maybe cache expired, use -nc to skip the cache')
 
             traceback.print_exc()
             os._exit(-1)
-        # self.update_song(song, song_pth, pic_pth)
 
 
 class QQAlbum(object):
@@ -106,7 +162,7 @@ class QQAlbum(object):
                 'title': '有一种悲伤',
                 'author': 'A-Lin',
                 'lrc': '...',
-                'url': 'http://dl.stream.qqmusic.qq.com/M5000019n6dS204TzZ.mp3?vkey=A08C2C65EF31C4AB117D2F4C06CA2F187EDE6DFC8769C93E2CB1DE30C5A3860E5360CD3A80E92ADE893AD5B4F46211E8B1F66136443979D7&guid=5150825362&fromtag=1',
+                'url': 'http://dl.stream.qqmusic.qq.com/M5000019n6dS204TzZ.mp3',
                 'pic': 'http://y.gtimg.cn/music/photo_new/T002R300x300M0000030IgT80txlIK.jpg'
             }
         Returns:
@@ -156,40 +212,23 @@ class Sonimei(object):
             log_level=log_level,
         )
         self.use_cache = use_cache
-
         self.site = site
+        self.save_dir = os.path.expanduser(cfg.get('snm.save_dir', '~/Music/sonimei'))
 
         if site == 'qq':
             self._album_handler = QQAlbum(log_level, use_cache)
         else:
             self._album_handler = NeteaseAlbum(log_level, use_cache)
-
-        self.save_dir = os.path.expanduser(cfg.get('snm.save_dir', '~/Music/sonimei'))
-        self._all_songs = []
-        self._song_metas = SongMetas(log_level <= 10)
-        self._override = override
+        # self._song_metas = SongMetas(log_level <= 10)
         self._downloader = Downloader(self.save_dir, self.ac.cache['site_media'], override)
+        self.store = MusicStore(self.save_dir, log_level)
         self._spawn()
 
     def _spawn(self):
         self.ac.headers['post'] = SonimeiHeaders.post
         self.ac.headers['Host'] = self.ac.domain
         helper.mkdir_p(self.save_dir, is_dir=True)
-        self.scan_all_songs()
-
-    @property
-    def all_songs(self):
-        return self._all_songs
-
-    def is_file_id3_ok(self, song_name):
-        song_pth = os.path.join(self.save_dir, song_name)
-        if song_pth[-4:] != '.mp3':
-            song_pth += '.mp3'
-
-        if helper.is_file_ok(song_pth):
-            has_pic, song_id3 = self._song_metas.get_song_meta(song_pth)
-            return has_pic, song_pth
-        return False, None
+        self.store.scan_all_songs()
 
     @staticmethod
     def get_best_match(songs, name, author):
@@ -234,59 +273,7 @@ class Sonimei(object):
 
         return songs
 
-    def parse_song(self, dat):
-        if isinstance(dat, str):
-            dat = json.loads(dat)
-        url = dat['url']
-        if self.site == 'qq':
-            song_extension = url.split('?')[0].split('.')[-1]
-        else:
-            # elif self.site == 'netease':
-            #     song_extension = url.split('.')[-1]
-            # else:
-            song_extension = 'mp3'
-        return song_extension
-
     def save_song(self, song):
         song, song_pth, pic_pth = self._downloader.save_song(song)
-        self.update_song(song, song_pth, pic_pth)
-
-    def update_song(self, song, song_pth, pic_pth):
-        tags = ['TIT2', 'TPE1', 'TALB']
-        site_dat = {'TPE1': song['author'].strip(), 'TIT2': song['title'].strip()}
-        has_pic, song_id3 = self._song_metas.get_song_meta(song_pth)
-
-        id3_same = True
-        # skip TALB
-        for tag in tags[:-1]:
-            if site_dat[tag] != song_id3.get(tag):
-                zlog.debug('Not Matched: site({}) != id3({})'.format(site_dat[tag], song_id3.get(tag)))
-                id3_same = False
-                # id3_same = id3_same and site_dat[tag] == song_id3[tag]
-        if not has_pic:
-            site_dat['APIC'] = pic_pth
-            id3_same = False
-
-        if not song_id3.get('TALB') or not id3_same:
-            site_dat['TALB'] = self._album_handler.get_album(song)
-
-        if not id3_same:
-            CP.G('update {}'.format(site_dat))
-            self._song_metas.update_song_meta(song_pth, site_dat)
-
-    def scan_all_songs(self):
-        self._all_songs = helper.walk_dir_with_filter(self.save_dir, prefix=['.DS_Store'])
-        self._all_songs = [x.split('/')[-1] for x in self._all_songs]
-
-    def is_file_exist(self, song_name):
-        """TODO: use sqlite to store song names"""
-        song_name = song_name.split('-')[-1].split('.')[0]
-        # print(song_name, local_musics)
-        similar = []
-        for song in self._all_songs:
-            song_ = '.'.join(song.split('.')[:-1])
-            candidates = [song_, *song_.split('-')]
-            if song_name in '#'.join(candidates):
-                similar.append(song)
-
-        return similar
+        album_info = self._album_handler.get_album(song)
+        self.store.update_song(song, song_pth, pic_pth, album_info)
