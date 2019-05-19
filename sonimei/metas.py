@@ -22,7 +22,7 @@ class SongMetas(object):
         self.CP = ColorPrint(silent_handle)
 
     def get_song_meta(self, name):
-        self.CP.G(('Found local file: ({})'.format(name)))
+        self.CP.G(('Try local file: ({})'.format(name)))
         self.CP.G('-' * 32)
 
         has_pic = False

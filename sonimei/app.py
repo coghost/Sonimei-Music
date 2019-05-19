@@ -21,6 +21,11 @@ from sonimei._sonimei import Sonimei
 
 PRETTY = Prettify(cfg)
 CP = ColorPrint()
+SITES = {
+    'kugou': 'kugou',
+    'netease': 'netease',
+    'qq': 'qq',
+}
 
 
 def local_existed(scan_mode, client, name):
@@ -63,8 +68,8 @@ def local_existed(scan_mode, client, name):
               help=fmt_help('use no cache', '-nc'))
 @click.option('--site', '-s',
               default='qq',
-              type=click.Choice(['qq', 'netease']),
-              help=fmt_help('the song source site', '-s <qq/netease>'))
+              type=click.Choice(list(SITES.values())),
+              help=fmt_help('the song source site', '-s <{}>'.format('/'.join(SITES.values()))))
 @click.option('--scan_mode', '-scan',
               is_flag=True,
               help=fmt_help('scan all songs and add id3 info', '-scan'))

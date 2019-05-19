@@ -9,9 +9,13 @@ from urllib.parse import urljoin
 import urllib3
 import re
 import traceback
+import requests
 
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 from logzero import logger as zlog
 from izen import helper
@@ -26,7 +30,21 @@ PRETTY = Prettify(cfg)
 CP = ColorPrint()
 
 from izen.crawler import AsyncCrawler
-from sonimei.site_header import NeteaseHeaders, QQHeaders
+from sonimei.site_header import NeteaseHeaders, QQHeaders, KugouHeaders
+
+
+def chrome_driver(headless=True):
+    options = Options()
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-gpu')
+    options.add_argument('blink-settings=imagesEnabled=false')
+    if headless:
+        options.add_argument('--headless')
+    driver = webdriver.Chrome(options=options)
+    driver.set_window_size(1366, 768)
+    driver.set_window_position(0, 0)
+    driver.set_page_load_timeout(30)
+    return driver
 
 
 class MusicStore(object):
@@ -107,7 +125,10 @@ class Downloader(object):
     def _download(self, src, save_to):
         if not self._override and helper.is_file_ok(save_to):
             zlog.debug('{} is downloaded.'.format(save_to))
-            return
+            return save_to
+        if self._override and helper.is_file_ok(save_to):
+            zlog.info('force remove exist file: ({})'.format(helper.C.format(save_to)))
+            os.remove(save_to)
         zlog.debug('try get {}'.format(save_to))
         try:
             wget.download(src, out=save_to)
@@ -129,7 +150,7 @@ class Downloader(object):
                 zlog.warning('song has no url: {}'.format(song))
                 return
             song_pth = self._download(song['url'], song_pth)
-            if not song_pth:
+            if song_pth == '':
                 error_hint('failed download song: {}'.format(song_pth))
                 os._exit(-1)
             pic_pth = self._download(song['pic'], pic_pth)
@@ -137,7 +158,6 @@ class Downloader(object):
         except Exception:
             zlog.error('failed {}'.format(song))
             error_hint('maybe cache expired, use -nc to skip the cache')
-
             traceback.print_exc()
             os._exit(-1)
 
@@ -159,8 +179,17 @@ class SiteAlbum(object):
         pass
 
 
+class MockAlbum(SiteAlbum):
+    def __init__(self, url='', log_level=10, use_cache=True):
+        super().__init__('mock_site', log_level, use_cache)
+
+    def get_album(self, dat):
+        zlog.info('got {}'.format(dat))
+        return ''
+
+
 class QQAlbum(SiteAlbum):
-    def __init__(self, log_level=10, use_cache=True):
+    def __init__(self, url='', log_level=10, use_cache=True):
         self.home = 'http://y.qq.com/'
         super().__init__(self.home, log_level, use_cache)
         self.ac.headers['get'] = QQHeaders.get
@@ -191,7 +220,7 @@ class QQAlbum(SiteAlbum):
 
 
 class NeteaseAlbum(SiteAlbum):
-    def __init__(self, log_level=10, use_cache=True):
+    def __init__(self, url='', log_level=10, use_cache=True):
         self.home = 'https://music.163.com/'
         super().__init__(self.home, log_level, use_cache)
         self.ac.headers['get'] = NeteaseHeaders.get
@@ -201,4 +230,19 @@ class NeteaseAlbum(SiteAlbum):
         doc = self.fetch(link)
         album_doc = doc.find_all(class_='des s-fc4')[-1]
         album = album_doc.a.text
+        return album
+
+
+class KugouAlbum(SiteAlbum):
+    def __init__(self, log_level=10, use_cache=True):
+        super().__init__('', log_level, use_cache)
+        self.driver = chrome_driver()
+
+    def get_album(self, dat):
+        """"""
+        css_selector = '.albumName>a'
+        self.driver.get(dat['link'])
+        elem = self.driver.find_element_by_css_selector(css_selector)
+        album = elem.get_attribute('title')
+        zlog.debug('album is: {}'.format(album))
         return album

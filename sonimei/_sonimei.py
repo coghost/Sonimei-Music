@@ -16,11 +16,14 @@ from izen import helper
 
 from sonimei.icfg import cfg
 from sonimei.site_header import SonimeiHeaders
-from sonimei.sites import QQAlbum, NeteaseAlbum, Downloader, MusicStore
+from sonimei.sites import Downloader, MusicStore
+from sonimei.sites import MockAlbum, QQAlbum, NeteaseAlbum, KugouAlbum
 
 album_factory = {
     'qq': QQAlbum,
     'netease': NeteaseAlbum,
+    'kugou': KugouAlbum,
+    'album': MockAlbum,
 }
 
 
@@ -37,7 +40,7 @@ class Sonimei(object):
         self.music_save_dir = os.path.expanduser(cfg.get('snm.save_dir', '~/Music/sonimei'))
         self.site = site
 
-        self._album_handler = album_factory.get(site)(log_level, use_cache)
+        self._album_handler = album_factory.get(site, MockAlbum)(log_level=log_level, use_cache=use_cache)
         self._downloader = Downloader(self.music_save_dir, self.ac.cache['site_media'], override)
         self.store = MusicStore(self.music_save_dir, log_level)
 
