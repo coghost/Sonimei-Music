@@ -6,13 +6,13 @@ import os
 import sys
 import json
 from urllib.parse import urljoin
+import urllib3
 import re
 import traceback
 
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
-import requests
 from logzero import logger as zlog
 from izen import helper
 from izen.prettify import ColorPrint, Prettify
@@ -20,12 +20,7 @@ from izen.prettify import ColorPrint, Prettify
 from sonimei.metas import SongMetas
 from sonimei.icfg import cfg
 from sonimei.zutil import error_hint
-from sonimei.site_header import SonimeiHeaders
 from sonimei import wget
-
-SITES = {
-    'qq': 'qq',
-}
 
 PRETTY = Prettify(cfg)
 CP = ColorPrint()
@@ -83,7 +78,7 @@ class MusicStore(object):
                 zlog.debug('Not Matched: site({}) != id3({})'.format(site_dat[tag], song_id3.get(tag)))
                 id3_same = False
                 # id3_same = id3_same and site_dat[tag] == song_id3[tag]
-        if not has_pic:
+        if not has_pic and pic_pth:
             site_dat['APIC'] = pic_pth
             id3_same = False
 
@@ -112,12 +107,17 @@ class Downloader(object):
     def _download(self, src, save_to):
         if not self._override and helper.is_file_ok(save_to):
             zlog.debug('{} is downloaded.'.format(save_to))
-        else:
-            zlog.debug('try get {}'.format(save_to))
+            return
+        zlog.debug('try get {}'.format(save_to))
+        try:
             wget.download(src, out=save_to)
             # wget output end without new line
             print()
-            zlog.info('downloaded {}'.format(helper.G.format(save_to)))
+            zlog.info('downloaded {}'.format(helper.G.format(save_to.split('/')[-1])))
+            return save_to
+        except Exception as e:
+            zlog.error('Download {} Failed: {}'.format(save_to.split('/')[-1], e))
+            return ''
 
     def save_song(self, song):
         extension = self._parse_song(song)
@@ -128,8 +128,11 @@ class Downloader(object):
             if not song.get('url'):
                 zlog.warning('song has no url: {}'.format(song))
                 return
-            self._download(song['url'], song_pth)
-            self._download(song['pic'], pic_pth)
+            song_pth = self._download(song['url'], song_pth)
+            if not song_pth:
+                error_hint('failed download song: {}'.format(song_pth))
+                os._exit(-1)
+            pic_pth = self._download(song['pic'], pic_pth)
             return song, song_pth, pic_pth
         except Exception:
             zlog.error('failed {}'.format(song))
@@ -139,17 +142,28 @@ class Downloader(object):
             os._exit(-1)
 
 
-class QQAlbum(object):
-    def __init__(self, log_level=10, use_cache=True):
-        self.home = 'http://y.qq.com/'
+class SiteAlbum(object):
+    def __init__(self, home, log_level=10, use_cache=True):
         self.ac = AsyncCrawler(
-            site_init_url=self.home,
+            site_init_url=home,
             base_dir=os.path.expanduser('~/.crawler'),
             timeout=10,
             log_level=log_level,
         )
-        self.ac.headers['get'] = QQHeaders.get
         self._use_cache = use_cache
+
+    def fetch(self, url):
+        return self.ac.bs4get(url, use_cache=self._use_cache)
+
+    def get_album(self, dat):
+        pass
+
+
+class QQAlbum(SiteAlbum):
+    def __init__(self, log_level=10, use_cache=True):
+        self.home = 'http://y.qq.com/'
+        super().__init__(self.home, log_level, use_cache)
+        self.ac.headers['get'] = QQHeaders.get
 
     def get_album(self, dat):
         """
@@ -168,7 +182,7 @@ class QQAlbum(object):
         Returns:
             album (str)
         """
-        doc = self.ac.bs4get(dat['link'], use_cache=self._use_cache)
+        doc = self.fetch(dat['link'])
         _pg = re.compile('g_SongData = *')
         rs = doc.find(string=_pg)
         rs = rs.split(' = ')
@@ -176,104 +190,15 @@ class QQAlbum(object):
         return detail['albumname']
 
 
-class NeteaseAlbum(object):
+class NeteaseAlbum(SiteAlbum):
     def __init__(self, log_level=10, use_cache=True):
         self.home = 'https://music.163.com/'
-        self.ac = AsyncCrawler(
-            site_init_url=self.home,
-            base_dir=os.path.expanduser('~/.crawler'),
-            timeout=10,
-            log_level=log_level,
-        )
+        super().__init__(self.home, log_level, use_cache)
         self.ac.headers['get'] = NeteaseHeaders.get
-        self._use_cache = use_cache
-
-    def _do_get(self, url):
-        doc = self.ac.bs4get(url)
-        album_doc = doc.find_all(class_='des s-fc4')[-1]
-        album = album_doc.a.text
-        return album
 
     def get_album(self, dat):
         link = urljoin(self.home, dat['link'].split('#')[1])
-        doc = self.ac.bs4get(link, use_cache=self._use_cache)
+        doc = self.fetch(link)
         album_doc = doc.find_all(class_='des s-fc4')[-1]
         album = album_doc.a.text
         return album
-
-
-class Sonimei(object):
-    def __init__(self, site='qq', use_cache=True, log_level=10, timeout=10, override=False):
-        self.home = 'http://music.sonimei.cn/'
-        self.ac = AsyncCrawler(
-            site_init_url=self.home,
-            base_dir=os.path.expanduser('~/.crawler'),
-            timeout=timeout,
-            log_level=log_level,
-        )
-        self.use_cache = use_cache
-        self.site = site
-        self.save_dir = os.path.expanduser(cfg.get('snm.save_dir', '~/Music/sonimei'))
-
-        if site == 'qq':
-            self._album_handler = QQAlbum(log_level, use_cache)
-        else:
-            self._album_handler = NeteaseAlbum(log_level, use_cache)
-        # self._song_metas = SongMetas(log_level <= 10)
-        self._downloader = Downloader(self.save_dir, self.ac.cache['site_media'], override)
-        self.store = MusicStore(self.save_dir, log_level)
-        self._spawn()
-
-    def _spawn(self):
-        self.ac.headers['post'] = SonimeiHeaders.post
-        self.ac.headers['Host'] = self.ac.domain
-        helper.mkdir_p(self.save_dir, is_dir=True)
-        self.store.scan_all_songs()
-
-    @staticmethod
-    def get_best_match(songs, name, author):
-        best_match = []
-        songs_got = []
-        for i, song in enumerate(songs):
-            _title = '{}-{}'.format(song['author'], song['title'])
-            url = song['url']
-            songs_got.append('{} {}'.format(_title, url))
-
-            b = False or author in song['author'] or song['author'] in author
-            b = b and (name in song['title'] or song['title'] in name)
-            if b:
-                best_match.append('{} {}'.format(_title, url))
-
-        keys = ['demo', 'live']
-        for k in keys:
-            if len(best_match) == 1:
-                return best_match[0]
-            elif not best_match:
-                return songs_got
-            best_match = [x for x in best_match if k not in x]
-
-        return best_match
-
-    def search_it(self, name, page=1):
-        form = {
-            'filter': 'name',
-            'type': self.site,
-            'page': page,
-            'input': name,
-        }
-        doc = {}
-        try:
-            doc = self.ac.bs4post(self.home, data=form, show_log=True, use_cache=self.use_cache)
-        except requests.exceptions.ReadTimeout as e:
-            zlog.error('ReadTimeout: {}'.format(e))
-        songs = doc.get('data')
-        if not songs:
-            zlog.warning('[{}] matched nothing.'.format(name))
-            os._exit(0)
-
-        return songs
-
-    def save_song(self, song):
-        song, song_pth, pic_pth = self._downloader.save_song(song)
-        album_info = self._album_handler.get_album(song)
-        self.store.update_song(song, song_pth, pic_pth, album_info)

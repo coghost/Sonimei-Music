@@ -17,7 +17,7 @@ from izen.prettify import ColorPrint, Prettify
 
 from sonimei.icfg import cfg
 from sonimei.zutil import fmt_help, error_hint
-from sonimei.sites import Sonimei
+from sonimei._sonimei import Sonimei
 
 PRETTY = Prettify(cfg)
 CP = ColorPrint()
@@ -106,7 +106,7 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mod
 
             songs = songs_store.get(page)
             if not songs:
-                zlog.info('from sonimei try: {}/{}/{}'.format(name, site, page))
+                zlog.info('from sonimei({}) try: {}/{}'.format(helper.G.format(site), name, page))
                 songs = _client.search_it(name, page=page)
                 songs_store[page] = songs
 
