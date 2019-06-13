@@ -21,7 +21,7 @@ from sonimei.sites import MockAlbum, QQAlbum, NeteaseAlbum, KugouAlbum
 
 album_factory = {
     'qq': QQAlbum,
-    'netease': NeteaseAlbum,
+    '163': NeteaseAlbum,
     'kugou': KugouAlbum,
     'album': MockAlbum,
 }

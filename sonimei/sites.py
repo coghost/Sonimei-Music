@@ -6,16 +6,11 @@ import os
 import sys
 import json
 from urllib.parse import urljoin
-import urllib3
 import re
 import traceback
-import requests
 
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
-
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 
 from logzero import logger as zlog
 from izen import helper
@@ -23,7 +18,7 @@ from izen.prettify import ColorPrint, Prettify
 
 from sonimei.metas import SongMetas
 from sonimei.icfg import cfg
-from sonimei.zutil import error_hint
+from sonimei.zutil import error_hint, headless_driver
 from sonimei import wget
 
 PRETTY = Prettify(cfg)
@@ -31,20 +26,6 @@ CP = ColorPrint()
 
 from izen.crawler import AsyncCrawler
 from sonimei.site_header import NeteaseHeaders, QQHeaders, KugouHeaders
-
-
-def chrome_driver(headless=True):
-    options = Options()
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-gpu')
-    options.add_argument('blink-settings=imagesEnabled=false')
-    if headless:
-        options.add_argument('--headless')
-    driver = webdriver.Chrome(options=options)
-    driver.set_window_size(1366, 768)
-    driver.set_window_position(0, 0)
-    driver.set_page_load_timeout(30)
-    return driver
 
 
 class MusicStore(object):
@@ -236,13 +217,16 @@ class NeteaseAlbum(SiteAlbum):
 class KugouAlbum(SiteAlbum):
     def __init__(self, log_level=10, use_cache=True):
         super().__init__('', log_level, use_cache)
-        self.driver = chrome_driver()
+        self.driver = headless_driver()
 
     def get_album(self, dat):
         """"""
-        css_selector = '.albumName>a'
-        self.driver.get(dat['link'])
-        elem = self.driver.find_element_by_css_selector(css_selector)
-        album = elem.get_attribute('title')
-        zlog.debug('album is: {}'.format(album))
-        return album
+        try:
+            css_selector = '.albumName>a'
+            self.driver.get(dat['link'])
+            elem = self.driver.find_element_by_css_selector(css_selector)
+            album = elem.get_attribute('title')
+            zlog.debug('album is: {}'.format(album))
+            return album
+        except Exception as e:
+            zlog.error('({}):{}'.format(dat.get('link'), e))

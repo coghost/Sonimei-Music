@@ -23,11 +23,11 @@ setup(
     long_description_content_type="text/markdown",
     license='GPL',
     install_requires=[
-        'wget', 'izen', 'click', 'logzero', 'mutagen', 'lxml', 'requests'
+        'wget', 'izen', 'click', 'logzero', 'mutagen', 'lxml', 'requests', 'selenium',
     ],
     entry_points={
         'console_scripts': [
-            'snmcli = sonimei:start'
+            'snm = sonimei:start'
         ],
     },
     project_urls={

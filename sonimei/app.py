@@ -11,20 +11,16 @@ app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
 import click
-from logzero import logger as zlog
 from izen import helper
-from izen.prettify import ColorPrint, Prettify
-
-from sonimei.icfg import cfg
+from sonimei.__const__ import CP, PRETTY
+from sonimei.icfg import cfg, zlog
 from sonimei.zutil import fmt_help, error_hint
 from sonimei._sonimei import Sonimei
 
-PRETTY = Prettify(cfg)
-CP = ColorPrint()
 SITES = {
-    'kugou': 'kugou',
-    'netease': 'netease',
     'qq': 'qq',
+    '163': '163',
+    'kugou': 'kugou',
 }
 
 

@@ -28,3 +28,4 @@ cfg = Conf(
 logzero.formatter(
     LFormatter(log_pre=cfg.get('log.symbol', ''))
 )
+zlog = logzero.logger
