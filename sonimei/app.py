@@ -24,6 +24,18 @@ SITES = {
 }
 
 
+def get_playing_netease_music():
+    try:
+        _pth = os.path.expanduser(cfg.get('163.log_dir'))
+        songs = helper.os_cmd("tail -n 50 {} | grep lyricsObject | grep -iv nmlyricmodel".format(_pth))
+        song = [x for x in songs.split('\n') if x][-1]
+        song = song.split(':')[-1].replace(' ', '')
+        return song
+    except Exception as e:
+        zlog.error('{}'.format(e))
+        return ''
+
+
 def local_existed(scan_mode, client, name):
     """judge if found from local, only press ``s`` will go next"""
     if not scan_mode:
@@ -69,11 +81,14 @@ def local_existed(scan_mode, client, name):
 @click.option('--scan_mode', '-scan',
               is_flag=True,
               help=fmt_help('scan all songs and add id3 info', '-scan'))
+@click.option('--auto_mode', '-a',
+              is_flag=True,
+              help=fmt_help('auto get music name from neteaseMusic', '-a'))
 @click.option('--timeout', '-to', type=int,
               help=fmt_help('default timeout', '-to'))
-def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mode):
+def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mode, auto_mode):
     """ a lovely script use sonimei search qq/netease songs """
-    if not name and not scan_mode:
+    if not name and not scan_mode and not auto_mode:
         error_hint('{0}>>> use -h for details <<<{0}'.format('' * 16))
         return
 
@@ -85,6 +100,10 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mod
 
     if scan_mode:
         scanned_songs = _client.store.all_songs
+    if auto_mode:
+        scanned_songs = [get_playing_netease_music()]
+        if not scanned_songs:
+            error_hint('{0}>>> some error happened, contact author for help <<<{0}'.format('' * 16))
 
     if not scanned_songs:
         scanned_songs = [x for x in name.split('#') if x]

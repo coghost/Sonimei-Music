@@ -133,14 +133,14 @@ class Downloader(object):
             song_pth = self._download(song['url'], song_pth)
             if song_pth == '':
                 error_hint('failed download song: {}'.format(song_pth))
-                os._exit(-1)
+                return '', '', ''
             pic_pth = self._download(song['pic'], pic_pth)
             return song, song_pth, pic_pth
         except Exception:
             zlog.error('failed {}'.format(song))
             error_hint('maybe cache expired, use -nc to skip the cache')
             traceback.print_exc()
-            os._exit(-1)
+            return '', '', ''
 
 
 class SiteAlbum(object):

@@ -10,10 +10,12 @@ import requests
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
+from requests.exceptions import ConnectionError, ConnectTimeout, ReadTimeout
 from logzero import logger as zlog
 from izen.crawler import AsyncCrawler
 from izen import helper
 
+from sonimei.zutil import log_and_quit
 from sonimei.icfg import cfg
 from sonimei.site_header import SonimeiHeaders
 from sonimei.sites import Downloader, MusicStore
@@ -43,6 +45,7 @@ class Sonimei(object):
         self._album_handler = album_factory.get(site, MockAlbum)(log_level=log_level, use_cache=use_cache)
         self._downloader = Downloader(self.music_save_dir, self.ac.cache['site_media'], override)
         self.store = MusicStore(self.music_save_dir, log_level)
+        self._song_name = ''
 
         self._spawn()
 
@@ -59,19 +62,22 @@ class Sonimei(object):
             'page': page,
             'input': name,
         }
+        self._song_name = name
         doc = {}
         try:
             doc = self.ac.bs4post(self.home, data=form, show_log=True, use_cache=self.use_cache)
-        except requests.exceptions.ReadTimeout as e:
+        except (ConnectTimeout, ConnectionError, ReadTimeout) as e:
             zlog.error('ReadTimeout: {}'.format(e))
         songs = doc.get('data')
         if not songs:
             zlog.warning('[{}] matched nothing.'.format(name))
-            os._exit(0)
+            log_and_quit(self._song_name, cfg.get('snm.failure_store'), 0)
 
         return songs
 
     def save_song(self, song):
         song, song_pth, pic_pth = self._downloader.save_song(song)
+        if not song:
+            log_and_quit(self._song_name, cfg.get('snm.failure_store'), 0)
         album_info = self._album_handler.get_album(song)
         self.store.update_song(song, song_pth, pic_pth, album_info)

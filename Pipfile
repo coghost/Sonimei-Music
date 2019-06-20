@@ -10,6 +10,7 @@ mutagen = "*"
 izen = {editable = true, path = "/Users/lihe/00Li/github/izen"}
 lxml = "*"
 urllib3 = ">=1.24.2"
+pyyaml = "*"
 
 [dev-packages]
 twine = "*"

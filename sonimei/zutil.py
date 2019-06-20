@@ -11,6 +11,7 @@ app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
 import click
+import yaml
 from izen import helper
 
 from selenium import webdriver
@@ -59,3 +60,22 @@ def chrome_driver(**kwargs):
 
 def headless_driver(headless=True):
     return chrome_driver(headless=headless)
+
+
+def log_and_quit(dat, pth, status=0):
+    yaml_dump(dat, pth)
+    os._exit(status)
+
+
+def yaml_loader(file_pth):
+    try:
+        with open(file_pth, 'rb') as f:
+            cfg = yaml.load(f, Loader=yaml.FullLoader)
+
+        return cfg
+    except Exception as e:
+        return
+
+
+def yaml_dump(dat, file_pth):
+    helper.write_file(yaml.dump(dat), file_pth)

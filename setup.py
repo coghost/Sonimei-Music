@@ -7,7 +7,7 @@ __description__ = '''
 
 from setuptools import setup, find_packages
 
-VERSION = '0.1.5'
+VERSION = '0.1.6'
 
 setup(
     name='sonimei',
@@ -23,7 +23,7 @@ setup(
     long_description_content_type="text/markdown",
     license='GPL',
     install_requires=[
-        'wget', 'izen', 'click', 'logzero', 'mutagen', 'lxml', 'requests', 'selenium',
+        'wget', 'izen', 'click', 'logzero', 'mutagen', 'lxml', 'requests', 'selenium', 'PyYAML'
     ],
     entry_points={
         'console_scripts': [
