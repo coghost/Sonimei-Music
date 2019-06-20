@@ -6,6 +6,7 @@ __description__ = '''
 '''
 import os
 import sys
+import json
 
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
@@ -15,7 +16,9 @@ from izen import helper
 from sonimei.__const__ import CP, PRETTY
 from sonimei.icfg import cfg, zlog
 from sonimei.zutil import fmt_help, error_hint
-from sonimei._sonimei import Sonimei
+from sonimei._sonimei import Sonimei, NeteaseDL
+
+HIGH_Q = 320
 
 SITES = {
     'qq': 'qq',
@@ -25,15 +28,14 @@ SITES = {
 
 
 def get_playing_netease_music():
+    songs = ''
     try:
-        _pth = os.path.expanduser(cfg.get('163.log_dir'))
-        songs = helper.os_cmd("tail -n 50 {} | grep lyricsObject | grep -iv nmlyricmodel".format(_pth))
-        song = [x for x in songs.split('\n') if x][-1]
-        song = song.split(':')[-1].replace(' ', '')
+        netease = NeteaseDL()
+        song = netease.search_it()
         return song
     except Exception as e:
-        zlog.error('{}'.format(e))
-        return ''
+        zlog.error('{}, {}'.format(e, songs))
+        return {}
 
 
 def local_existed(scan_mode, client, name):
@@ -84,11 +86,18 @@ def local_existed(scan_mode, client, name):
 @click.option('--auto_mode', '-a',
               is_flag=True,
               help=fmt_help('auto get music name from neteaseMusic', '-a'))
+@click.option('--failure_songs', '-fs',
+              is_flag=True,
+              help=fmt_help('show failure songs', '-fs'))
+@click.option('--force_netease', '-163',
+              is_flag=True,
+              help=fmt_help('show failure songs', '-163'))
 @click.option('--timeout', '-to', type=int,
               help=fmt_help('default timeout', '-to'))
-def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mode, auto_mode):
+def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mode, auto_mode, failure_songs,
+        force_netease):
     """ a lovely script use sonimei search qq/netease songs """
-    if not name and not scan_mode and not auto_mode:
+    if not name and not scan_mode and not auto_mode and not failure_songs:
         error_hint('{0}>>> use -h for details <<<{0}'.format('' * 16))
         return
 
@@ -96,14 +105,45 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mod
     # else will be the name passed in
     scanned_songs = []
     timeout = timeout or cfg.get('snm.timeout')
-    _client = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout, override=force_mode)
+    if not force_netease:
+        _client = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout, override=force_mode)
+    else:
+        _client = NeteaseDL(log_level=log_level * 10)
+
+    if failure_songs:
+        dat = _client.load_failure_songs()
+        if not dat:
+            error_hint('{0}>>> no failed songs <<<{0}'.format('' * 16), bg='green')
+            os._exit(0)
+        for i, s in enumerate(dat):
+            CP.Y('{}. {}'.format(i + 1, s))
+            scanned_songs.append(s)
+        ch = click.confirm(helper.C.format('do you want continue with downloading all failure songs...'), default=True)
+        if not ch:
+            os._exit(0)
 
     if scan_mode:
         scanned_songs = _client.store.all_songs
     if auto_mode:
-        scanned_songs = [get_playing_netease_music()]
-        if not scanned_songs:
+        song = get_playing_netease_music()
+        if not song:
             error_hint('{0}>>> some error happened, contact author for help <<<{0}'.format('' * 16))
+            os._exit(0)
+        else:
+            song_info = '{}-{}'.format(song['author'], song['title'])
+            CP.G('current playing: [{}]'.format(
+                helper.Y.format(
+                    '{}({}M/{}bits)'.format(
+                        song_info,
+                        round(int(song['fileSize']) / (1024.0 * 1024.0), 2),
+                        song['bitrate']))))
+            scanned_songs = [song_info]
+            if int(song['bitrate']) >= HIGH_Q:
+                # if bitrate >= 320, we will force use it
+                ch = click.confirm(helper.C.format('high quality song got, force use NeteaseMusic/163 Source ?'),
+                                   default=True)
+                if ch:
+                    _client = NeteaseDL(log_level=log_level * 10)
 
     if not scanned_songs:
         scanned_songs = [x for x in name.split('#') if x]
@@ -128,6 +168,8 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mod
             if not songs:
                 zlog.info('from sonimei({}) try: {}/{}'.format(helper.G.format(site), name, page))
                 songs = _client.search_it(name, page=page)
+                if not isinstance(songs, list):
+                    songs = [songs]
                 songs_store[page] = songs
 
             is_searched_from_site = True

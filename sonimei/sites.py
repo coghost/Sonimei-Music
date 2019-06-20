@@ -42,6 +42,10 @@ class MusicStore(object):
         self._all_songs = helper.walk_dir_with_filter(self._music_dir, prefix=['.DS_Store'])
         self._all_songs = [x.split('/')[-1] for x in self._all_songs]
 
+    def get_size(self, name):
+        size = helper.is_file_ok(self._music_dir + '/{}'.format(name))
+        return round(size / 1024 / 1024, 2)
+
     def is_file_exist(self, song_name):
         """TODO: use sqlite to store song names"""
         song_name = song_name.split('-')[-1].split('.')[0]
@@ -51,7 +55,7 @@ class MusicStore(object):
             song_ = '.'.join(song.split('.')[:-1])
             candidates = [song_, *song_.split('-')]
             if song_name in '#'.join(candidates):
-                similar.append(song)
+                similar.append('{}{}'.format(song, helper.Y.format(' ({}M)').format(self.get_size(song))))
 
         return similar
 

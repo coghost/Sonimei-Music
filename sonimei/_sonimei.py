@@ -5,7 +5,7 @@ __description__ = '''
 
 import os
 import sys
-import requests
+import json
 
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
@@ -14,8 +14,8 @@ from requests.exceptions import ConnectionError, ConnectTimeout, ReadTimeout
 from logzero import logger as zlog
 from izen.crawler import AsyncCrawler
 from izen import helper
+import yaml
 
-from sonimei.zutil import log_and_quit
 from sonimei.icfg import cfg
 from sonimei.site_header import SonimeiHeaders
 from sonimei.sites import Downloader, MusicStore
@@ -46,6 +46,7 @@ class Sonimei(object):
         self._downloader = Downloader(self.music_save_dir, self.ac.cache['site_media'], override)
         self.store = MusicStore(self.music_save_dir, log_level)
         self._song_name = ''
+        self.failure_store = cfg.get('snm.failure_store')
 
         self._spawn()
 
@@ -71,13 +72,76 @@ class Sonimei(object):
         songs = doc.get('data')
         if not songs:
             zlog.warning('[{}] matched nothing.'.format(name))
-            log_and_quit(self._song_name, cfg.get('snm.failure_store'), 0)
+            self.log_and_quit(self._song_name, 0)
 
         return songs
 
     def save_song(self, song):
         song, song_pth, pic_pth = self._downloader.save_song(song)
         if not song:
-            log_and_quit(self._song_name, cfg.get('snm.failure_store'), 0)
+            self.log_and_quit(self._song_name, 0)
         album_info = self._album_handler.get_album(song)
         self.store.update_song(song, song_pth, pic_pth, album_info)
+        self.dump_failure_songs(self._song_name, action='D')
+
+    def log_and_quit(self, song, status=0):
+        self.dump_failure_songs(song)
+        os._exit(status)
+
+    def load_failure_songs(self):
+        try:
+            file_pth = os.path.expanduser(self.failure_store)
+            with open(file_pth, 'rb') as f:
+                dat = yaml.load(f, Loader=yaml.FullLoader)
+
+            return dat
+        except Exception as e:
+            return
+
+    def dump_failure_songs(self, song, action='C'):
+        dat = self.load_failure_songs() or []
+        if action == 'C':
+            dat.append(song)
+        elif action == 'D':
+            if song in dat:
+                dat.pop(dat.index(song))
+        else:
+            zlog.error('unsupported action: ({})'.format(action))
+            return
+
+        dat = list(set(dat))
+        dat = yaml.dump(dat)
+        file_pth = os.path.expanduser(self.failure_store)
+        helper.write_file(dat, file_pth)
+
+
+class NeteaseDL(Sonimei):
+    def __init__(self, site='163', use_cache=True, log_level=20, timeout=10, override=False):
+        super().__init__(site, use_cache, log_level, timeout, override)
+        self.log_dir = os.path.expanduser(cfg.get('163.log_dir'))
+
+    def search_it(self, name='', page=1):
+        try:
+            _cmd = "tail -n {} {} | grep songName".format(cfg.get('163.log_count'), self.log_dir)
+            songs = helper.os_cmd(_cmd)
+            line = [x for x in songs.split('\n') if x][-1]
+            line = '{' + line.split('{')[1]
+            song = json.loads(line)
+            # update according to the caller
+            song['author'] = song['artistName']
+            song['title'] = song['songName']
+            song['pic'] = song['url'] + '?imageView&enlarge=1&quality=90&thumbnail=440y440'
+            # m8.music may not available all time, so use m7
+            song['url'] = song['musicurl'].replace('m8.music.126.net', 'm7.music.126.net')
+            return song
+        except Exception as e:
+            zlog.error('{}'.format(e))
+            return ''
+
+    def save_song(self, song):
+        album_info = song['albumName']
+        song, song_pth, pic_pth = self._downloader.save_song(song)
+        if not song:
+            self.log_and_quit(self._song_name, 0)
+        self.store.update_song(song, song_pth, pic_pth, album_info)
+        self.dump_failure_songs(self._song_name, action='D')
