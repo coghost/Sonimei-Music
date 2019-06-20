@@ -108,7 +108,7 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mod
     if not force_netease:
         _client = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout, override=force_mode)
     else:
-        _client = NeteaseDL(log_level=log_level * 10)
+        _client = NeteaseDL(not no_cache, log_level=log_level * 10, timeout=timeout, override=force_mode)
 
     if failure_songs:
         dat = _client.load_failure_songs()
@@ -162,7 +162,8 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mod
             status, song_pth = _client.store.is_file_id3_ok(name)
             if status:
                 CP.G(PRETTY.symbols['music'], '[{}] is found and updated'.format(song_pth))
-                break
+                if not force_mode:
+                    break
 
             songs = songs_store.get(page)
             if not songs:

@@ -32,7 +32,7 @@ class MusicStore(object):
     def __init__(self, song_dir, log_level=10):
         self._music_dir = song_dir
         self._all_songs = []
-        self._song_metas = SongMetas(log_level <= 10)
+        self._song_metas = SongMetas(log_level > 10)
 
     @property
     def all_songs(self):
@@ -89,7 +89,7 @@ class MusicStore(object):
             site_dat['TALB'] = album_info
 
         if not id3_same:
-            CP.G('update {}'.format(site_dat))
+            zlog.debug('update {}'.format(site_dat))
             self._song_metas.update_song_meta(song_pth, site_dat)
 
 
@@ -104,12 +104,12 @@ class Downloader(object):
         if isinstance(dat, str):
             dat = json.loads(dat)
         url = dat.get('url')
-        zlog.info('song url: [{}]'.format(url))
+        zlog.debug('song url: [{}]'.format(url))
         return 'mp3'
 
     def _download(self, src, save_to):
         if not self._override and helper.is_file_ok(save_to):
-            zlog.debug('{} is downloaded.'.format(save_to))
+            zlog.info('{} is downloaded.'.format(save_to))
             return save_to
         if self._override and helper.is_file_ok(save_to):
             zlog.info('force remove exist file: ({})'.format(helper.C.format(save_to)))
