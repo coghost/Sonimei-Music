@@ -94,12 +94,14 @@ class Sonimei(object):
             with open(file_pth, 'rb') as f:
                 dat = yaml.load(f, Loader=yaml.FullLoader)
 
+            dat = [x for x in dat if x]
             return dat
         except Exception as e:
             return
 
     def dump_failure_songs(self, song, action='C'):
         dat = self.load_failure_songs() or []
+        dat = [x for x in dat if x]
         if action == 'C':
             dat.append(song)
         elif action == 'D':
@@ -130,6 +132,7 @@ class NeteaseDL(Sonimei):
             # update according to the caller
             song['author'] = song['artistName']
             song['title'] = song['songName']
+            self._song_name = '{}-{}'.format(song['author'], song['title'])
             song['pic'] = song['url'] + '?imageView&enlarge=1&quality=90&thumbnail=440y440'
             # m8.music may not available all time, so use m7
             song['url'] = song['musicurl'].replace('m8.music.126.net', 'm7.music.126.net')
