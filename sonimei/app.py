@@ -91,7 +91,7 @@ def local_existed(scan_mode, client, name):
               help=fmt_help('show failure songs', '-fs'))
 @click.option('--force_netease', '-163',
               is_flag=True,
-              help=fmt_help('show failure songs', '-163'))
+              help=fmt_help('force use netease logs to parse playing song info and download', '-163'))
 @click.option('--timeout', '-to', type=int,
               help=fmt_help('default timeout', '-to'))
 def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mode, auto_mode, failure_songs,

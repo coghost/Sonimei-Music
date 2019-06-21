@@ -10,14 +10,15 @@ music downloader of [sonimei.cn](http://music.sonimei.cn/)
 
 ### Todo
 
-- [ ] parse netease playlist and download all
-- [ ] cache qq album
+- [ ] ~~parse netease playlist and download all~~
 - [ ] add nosetests
+- [ ] maybe more other sites from sonimei
 
 ### Sites supported
 
 - [x] qq
-- [x] netease
+- [x] 163(netease)
+- [x] kugou
 
 ### Capability
 
@@ -31,11 +32,20 @@ music downloader of [sonimei.cn](http://music.sonimei.cn/)
 - [x] the search candidates cached in the app lifecycle
 - [x] colorful ui :)
 
+#### new features
+
+- [x] auto cache downloaded album covers, until you manually delete them
+- [x] if you are listening NeteaseMusic, with `snm -a` will auto get the song's name and try download it, no need to copy/search anymore
+- [x] if the NeteaseMusic with High-Qulity `320Kbps`, will prompt to download it directly, but you can always skip it.
+- [x] if some song download failed, will store it, and with `snm -fs` you can re-download it again.
+
 ### Install
 
 ```bash
 cd <PATH>/Sonimei-Music
 python setup.py install
+# reinstall
+pip/3 uninstall sonimei -y && python setup.py instal
 ```
 
 ### sonime config/stored files/caches
@@ -67,19 +77,29 @@ edit config:`sonimei.cfg`
 
 #### caches
 
-cached raw: `~/.crawler/music.sonimei.cn/` 
+cached raw: `~/.crawler/music.sonimei.cn/raw` 
+
+cached covers: `~/.crawler/music.sonimei.cn/media`
 
 cached netease raw: `~/.crawler/music.163.com`
 
 ### usage
 
-if installed `snmcli` can be called from terminal
+if installed `snm` can be called from terminal
 
-#### no params: `snmcli`
+#### new feature
+
+##### A. `snm -a` will get current playing neteasemusic song, and try download
+
+##### B. `snm -fs` will found all download failed songs, and try re-download them.
+
+![auto-163-retry-failure](docs/images/auto-163-retry-failure.png)
+
+#### no params: `snm`
 
 if no params supplied, will show `-h` hints
 
-#### show help: `snmcli -h/--help`
+#### show help: `snm -h/--help`
 
 ![help](docs/images/help.png)
 
@@ -99,9 +119,11 @@ if no params supplied, will show `-h` hints
 
 `s` skip current song, if in scan mode
 
-#### choose site: -s netease
+#### choose site: -s 163/kugou 
 
-![from_netease](docs/images/from_netease.png)
+but now, both not available `I just use the sonimei site result`, I don't use 163/kugou, I prefer qq, so I just leave it here.
+
+![from_netease](docs/images/with_site_param.png)
 
 #### scan
 
