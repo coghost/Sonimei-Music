@@ -6,12 +6,11 @@ __description__ = '''
 '''
 
 from setuptools import setup, find_packages
-
-VERSION = '0.1.7'
+from sonimei.__const__ import __VERSION__
 
 setup(
     name='sonimei',
-    version=VERSION,
+    version=__VERSION__,
     packages=find_packages(),
     include_package_data=True,
     package_data={'': ['*.tpl', '*.md']},
@@ -27,7 +26,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'snm = sonimei:start'
+            'snm = sonimei.app:run'
         ],
     },
     project_urls={

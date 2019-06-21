@@ -13,7 +13,7 @@ sys.path.append(app_root)
 
 import click
 from izen import helper
-from sonimei.__const__ import CP, PRETTY
+from sonimei.__const__ import CP, PRETTY, __VERSION__
 from sonimei.icfg import cfg, zlog
 from sonimei.zutil import fmt_help, error_hint
 from sonimei._sonimei import Sonimei, NeteaseDL
@@ -25,6 +25,13 @@ SITES = {
     '163': '163',
     'kugou': 'kugou',
 }
+
+
+def print_version(ctx, param, value):
+    if not value or ctx.resilient_parsing:
+        return
+    click.echo('Version {}'.format(__VERSION__))
+    ctx.exit()
 
 
 def get_playing_netease_music():
@@ -94,6 +101,8 @@ def local_existed(scan_mode, client, name):
               help=fmt_help('force use netease logs to parse playing song info and download', '-163'))
 @click.option('--timeout', '-to', type=int,
               help=fmt_help('default timeout', '-to'))
+@click.option('--version', is_flag=True, callback=print_version,
+              expose_value=False, is_eager=True)
 def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mode, auto_mode, failure_songs,
         force_netease):
     """ a lovely script use sonimei search qq/netease songs """
