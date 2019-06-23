@@ -7,10 +7,12 @@ name = "pypi"
 requests = ">=2.20.0"
 wget = "*"
 mutagen = "*"
-izen = {editable = true, path = "/Users/lihe/00Li/github/izen"}
+izen = {editable = true,path = "/Users/lihe/00Li/github/izen"}
 lxml = "*"
 urllib3 = ">=1.24.2"
 pyyaml = "*"
+sh = "*"
+decorator = "*"
 
 [dev-packages]
 twine = "*"

@@ -6,25 +6,16 @@ __description__ = '''
 '''
 import os
 import sys
-import json
 
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
 import click
 from izen import helper
-from sonimei.__const__ import CP, PRETTY, __VERSION__
+from sonimei.__const__ import CP, PRETTY, __VERSION__, SITES
 from sonimei.icfg import cfg, zlog
 from sonimei.zutil import fmt_help, error_hint
-from sonimei._sonimei import Sonimei, NeteaseDL
-
-HIGH_Q = 320
-
-SITES = {
-    'qq': 'qq',
-    '163': '163',
-    'kugou': 'kugou',
-}
+from sonimei._sonimei import Sonimei, NeteaseDL, check_player, check_failure, check_local, FailureHandle
 
 
 def print_version(ctx, param, value):
@@ -34,44 +25,21 @@ def print_version(ctx, param, value):
     ctx.exit()
 
 
-def get_playing_netease_music():
-    songs = ''
-    try:
-        netease = NeteaseDL()
-        song = netease.search_it()
-        return song
-    except Exception as e:
-        zlog.error('{}, {}'.format(e, songs))
-        return {}
-
-
-def local_existed(scan_mode, client, name):
-    """judge if found from local, only press ``s`` will go next"""
-    if not scan_mode:
-        client.scan_all_songs()
-        cache = client.is_file_exist(name)
-        if cache:
-            CP.G('Found from local, still want search and download???')
-            CP.R('press s to skip local, and re-download, or other key to exit')
-            c = helper.num_choice(
-                cache, default='q', valid_keys='s',
-                extra_hints='s-skip',
-            )
-            if c == 's':
-                return False
-            return True
-    return False
-
-
 @click.command(
     context_settings=dict(
         help_option_names=['-h', '--help'],
         terminal_width=200,
     ),
 )
-@click.option('--force_mode', '-f',
-              is_flag=True, default=False,
-              help=fmt_help('force override local file', '-f'))
+@click.option('--auto_mode', '-a',
+              is_flag=True,
+              help=fmt_help('auto get music name from NeteaseMusic/Spotify', '-a'))
+@click.option('--clear_failure_songs', '-cfs',
+              is_flag=True,
+              help=fmt_help('clear all download failure songs', '-cfs'))
+@click.option('--failure_songs', '-fs',
+              is_flag=True,
+              help=fmt_help('show failure songs and download', '-fs'))
 @click.option('--log_level', '-l',
               default=2, type=click.IntRange(1, 5),
               help=fmt_help('set log level', '-l <1~5>\n1=Debug,2=Info,3=Warn,4=Error,5=Fatal'))
@@ -83,6 +51,9 @@ def local_existed(scan_mode, client, name):
 @click.option('--no_cache', '-nc',
               is_flag=True,
               help=fmt_help('use no cache', '-nc'))
+@click.option('--override', '-o',
+              is_flag=True, default=False,
+              help=fmt_help('force override local file', '-f'))
 @click.option('--site', '-s',
               default='qq',
               type=click.Choice(list(SITES.values())),
@@ -90,72 +61,47 @@ def local_existed(scan_mode, client, name):
 @click.option('--scan_mode', '-scan',
               is_flag=True,
               help=fmt_help('scan all songs and add id3 info', '-scan'))
-@click.option('--auto_mode', '-a',
-              is_flag=True,
-              help=fmt_help('auto get music name from neteaseMusic', '-a'))
-@click.option('--failure_songs', '-fs',
-              is_flag=True,
-              help=fmt_help('show failure songs', '-fs'))
-@click.option('--force_netease', '-163',
-              is_flag=True,
-              help=fmt_help('force use netease logs to parse playing song info and download', '-163'))
 @click.option('--timeout', '-to', type=int,
               help=fmt_help('default timeout', '-to'))
 @click.option('--version', is_flag=True, callback=print_version,
               expose_value=False, is_eager=True)
-def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mode, auto_mode, failure_songs,
-        force_netease):
+def run(name, site, multiple, no_cache, log_level,
+        scan_mode, timeout, override,
+        auto_mode, failure_songs, clear_failure_songs):
     """ a lovely script use sonimei search qq/netease songs """
-    if not name and not scan_mode and not auto_mode and not failure_songs:
-        error_hint('{0}>>> use -h for details <<<{0}'.format('' * 16))
-        return
+    # if not name and not scan_mode and not auto_mode and not failure_songs:
+    #     error_hint('{0}>>> use -h for details <<<{0}'.format('' * 16))
+    #     return
 
     # if scan_mode, will be all songs local
     # else will be the name passed in
     scanned_songs = []
     timeout = timeout or cfg.get('snm.timeout')
-    if not force_netease:
-        _client = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout, override=force_mode)
-    else:
-        _client = NeteaseDL(not no_cache, log_level=log_level * 10, timeout=timeout, override=force_mode)
+    force_netease = False
+    if clear_failure_songs:
+        FailureHandle().dump_failure_songs([], action='clear')
+        os._exit(0)
+
+    if auto_mode:
+        force_netease, scanned_songs = check_player(auto_mode)
 
     if failure_songs:
-        dat = _client.load_failure_songs()
-        if not dat:
-            error_hint('{0}>>> no failed songs <<<{0}'.format('' * 16), bg='green')
-            os._exit(0)
-        for i, s in enumerate(dat):
-            CP.Y('{}. {}'.format(i + 1, s))
-            scanned_songs.append(s)
-        ch = click.confirm(helper.C.format('do you want continue with downloading all failure songs...'), default=True)
-        if not ch:
-            os._exit(0)
+        scanned_songs = check_failure(failure_songs)
+
+    if force_netease:
+        _client = NeteaseDL(not no_cache, log_level=log_level * 10, timeout=timeout, override=override)
+    else:
+        _client = Sonimei(site, not no_cache, log_level=log_level * 10, timeout=timeout, override=override)
 
     if scan_mode:
+        _client.store.scan_all_songs()
         scanned_songs = _client.store.all_songs
-    if auto_mode:
-        song = get_playing_netease_music()
-        if not song:
-            error_hint('{0}>>> some error happened, contact author for help <<<{0}'.format('' * 16))
-            os._exit(0)
-        else:
-            song_info = '{}-{}'.format(song['author'], song['title'])
-            CP.G('current playing: [{}]'.format(
-                helper.Y.format(
-                    '{}({}M/{}bits)'.format(
-                        song_info,
-                        round(int(song['fileSize']) / (1024.0 * 1024.0), 2),
-                        song['bitrate']))))
-            scanned_songs = [song_info]
-            if int(song['bitrate']) >= HIGH_Q:
-                # if bitrate >= 320, we will force use it
-                ch = click.confirm(helper.C.format('high quality song got, force use NeteaseMusic/163 Source ?'),
-                                   default=True)
-                if ch:
-                    _client = NeteaseDL(log_level=log_level * 10)
+
+    if name:
+        scanned_songs = [x for x in name.split('#') if x]
 
     if not scanned_songs:
-        scanned_songs = [x for x in name.split('#') if x]
+        error_hint('{0}>>> use -h for details <<<{0}'.format('' * 16), quit_out=None)
 
     for i, name in enumerate(scanned_songs):
         songs_store = {}
@@ -164,14 +110,17 @@ def run(name, site, multiple, no_cache, log_level, scan_mode, timeout, force_mod
         CP.F((PRETTY.symbols['right'] + ' ') * 2, 'processing/total: {}/{}'.format(i + 1, len(scanned_songs)))
 
         while True:
-            if not is_searched_from_site and local_existed(scan_mode, _client.store, name):
+            if not is_searched_from_site and check_local(scan_mode, _client.store, name):
                 CP.G(PRETTY.symbols['end'], 'quit')
                 break
 
             status, song_pth = _client.store.is_file_id3_ok(name)
             if status:
                 CP.G(PRETTY.symbols['music'], '[{}] is found and updated'.format(song_pth))
-                if not force_mode:
+                if not override:
+                    error_hint('>>> you can do force download with -f <<<',
+                               empty_line=False,
+                               bg='black', fg='yellow')
                     break
 
             songs = songs_store.get(page)

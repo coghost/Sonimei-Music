@@ -8,3 +8,10 @@ IS_PROD = False
 
 PRETTY = Prettify(cfg)
 CP = ColorPrint()
+HIGH_Q = 320
+
+SITES = {
+    'qq': 'qq',
+    '163': '163',
+    'kugou': 'kugou',
+}

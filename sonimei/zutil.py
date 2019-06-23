@@ -27,12 +27,15 @@ def fmt_help(*args, show_more=True, opt_hint='[OPT] '):
     return desc
 
 
-def error_hint(hints, empty_line=True, bg='blue', fg='white'):
+def error_hint(hints, empty_line=True, bg='blue', fg='white', quit_out=0):
     if empty_line:
         print()
     click.secho(hints, bg=bg, fg=fg)
     if empty_line:
         print()
+
+    if isinstance(quit_out, int):
+        os._exit(0)
 
 
 def chrome_driver(**kwargs):

@@ -136,13 +136,13 @@ class Downloader(object):
                 return
             song_pth = self._download(song['url'], song_pth)
             if song_pth == '':
-                error_hint('failed download song: {}'.format(song_pth))
+                error_hint('failed download song: {}'.format(song_pth), quit_out=None)
                 return '', '', ''
             pic_pth = self._download(song['pic'], pic_pth)
             return song, song_pth, pic_pth
         except Exception:
             zlog.error('failed {}'.format(song))
-            error_hint('maybe cache expired, use -nc to skip the cache')
+            error_hint('maybe cache expired, use -nc to skip the cache', quit_out=None)
             traceback.print_exc()
             return '', '', ''
 
