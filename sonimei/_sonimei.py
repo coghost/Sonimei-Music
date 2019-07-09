@@ -148,13 +148,14 @@ class NeteaseDL(Sonimei):
             line = [x for x in songs.split('\n') if x][-1]
             line = '{' + line.split('{')[1]
             song = json.loads(line)
-            # update according to the caller
-            song['author'] = song['artistName']
+            # update according to the caller, artistName may has '/' if with multiple singers
+            song['author'] = song['artistName'].replace('/', '-')
             song['title'] = song['songName']
             self._song_name = '{}-{}'.format(song['author'], song['title'])
             song['pic'] = song['url'] + '?imageView&enlarge=1&quality=90&thumbnail=440y440'
             # m8.music may not available all time, so use m7
             song['url'] = song['musicurl'].replace('m8.music.126.net', 'm7.music.126.net')
+            zlog.debug('song: {}'.format(song))
             return song
         except Exception as e:
             zlog.error('{}'.format(e))
@@ -213,7 +214,7 @@ def check_neteasemusic_playing():
         error_hint('{0}>>> some error happened, contact author for help <<<{0}'.format('' * 16))
 
     song_info = '{}-{}'.format(song['author'], song['title'])
-    CP.G('current playing  : [{}]'.format(
+    CP.G('current playing:  {}'.format(
         helper.Y.format(
             '{}({}M/{}bits)'.format(
                 song_info,
