@@ -34,6 +34,9 @@ def print_version(ctx, param, value):
 @click.option('--auto_mode', '-a',
               is_flag=True,
               help=fmt_help('auto get music name from NeteaseMusic/Spotify', '-a'))
+@click.option('--from_163_logs', '-163',
+              is_flag=True,
+              help=fmt_help('force using netease logs to download', '-163'))
 @click.option('--clear_failure_songs', '-cfs',
               is_flag=True,
               help=fmt_help('clear all download failure songs', '-cfs'))
@@ -53,7 +56,7 @@ def print_version(ctx, param, value):
               help=fmt_help('use no cache', '-nc'))
 @click.option('--override', '-o',
               is_flag=True, default=False,
-              help=fmt_help('force override local file', '-f'))
+              help=fmt_help('force override local file', '-o'))
 @click.option('--site', '-s',
               default='qq',
               type=click.Choice(list(SITES.values())),
@@ -65,14 +68,13 @@ def print_version(ctx, param, value):
               help=fmt_help('default timeout', '-to'))
 @click.option('--version', is_flag=True, callback=print_version,
               expose_value=False, is_eager=True)
-def run(name, site, multiple, no_cache, log_level,
+def run(
+        name, site, multiple, no_cache, log_level,
         scan_mode, timeout, override,
-        auto_mode, failure_songs, clear_failure_songs):
+        auto_mode, failure_songs, clear_failure_songs,
+        from_163_logs,
+):
     """ a lovely script use sonimei search qq/netease songs """
-    # if not name and not scan_mode and not auto_mode and not failure_songs:
-    #     error_hint('{0}>>> use -h for details <<<{0}'.format('' * 16))
-    #     return
-
     # if scan_mode, will be all songs local
     # else will be the name passed in
     scanned_songs = []
@@ -87,6 +89,9 @@ def run(name, site, multiple, no_cache, log_level,
 
     if failure_songs:
         scanned_songs = check_failure(failure_songs)
+
+    if from_163_logs:
+        force_netease = from_163_logs
 
     if force_netease:
         _client = NeteaseDL(not no_cache, log_level=log_level * 10, timeout=timeout, override=override)
@@ -118,7 +123,7 @@ def run(name, site, multiple, no_cache, log_level,
             if status:
                 CP.G(PRETTY.symbols['music'], '[{}] is found and updated'.format(song_pth))
                 if not override:
-                    error_hint('>>> you can do force download with -f <<<',
+                    error_hint('>>> you can do force download with -o <<<',
                                empty_line=False,
                                bg='black', fg='yellow')
                     break

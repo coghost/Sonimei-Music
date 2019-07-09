@@ -122,7 +122,7 @@ class Downloader(object):
             zlog.info('downloaded {}'.format(helper.G.format(save_to.split('/')[-1])))
             return save_to
         except Exception as e:
-            zlog.error('Download {} Failed: {}'.format(save_to.split('/')[-1], e))
+            zlog.error('Download {}({}) Failed: {}'.format(save_to.split('/')[-1], src, e))
             return ''
 
     def save_song(self, song):
