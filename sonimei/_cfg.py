@@ -10,13 +10,12 @@ import sys
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
-from izen.icfg import Conf, LFormatter
-import logzero
+from icfg import ICfg
 
 PROJECT = 'sonimei'
 
-cfg = Conf(
-    pth=os.path.expanduser('~/.{0}/{0}.cfg'.format(PROJECT)),
+cfg_obj = ICfg(
+    config_file=os.path.expanduser('~/.{0}/{0}.cfg'.format(PROJECT)),
     dat={
         'pretty.symbols': ' ,,,, ,,,,,,,,ﴖ,,,,,,,♪,',
         'snm.save_dir': '~/Music/sonimei',
@@ -27,10 +26,7 @@ cfg = Conf(
         '163.log_dir': os.path.expanduser(
             '~/Library/Containers/com.netease.163music/Data/Documents/storage/Logs/music.163.log'),
     },
-).cfg
-
-logzero.formatter(
-    LFormatter(log_pre=cfg.get('log.symbol', ''))
 )
-logzero.loglevel(cfg.get('log.level'), 20)
-zlog = logzero.logger
+
+zlog = cfg_obj.zlog
+cfg = cfg_obj.cfg

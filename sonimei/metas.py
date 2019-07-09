@@ -12,9 +12,8 @@ sys.path.append(app_root)
 
 from mutagen.id3 import ID3, TIT2, TALB, TPE1, APIC, PictureType, Encoding
 from mutagen import mp3, id3
-from izen import helper
-from izen.helper import R, B, G
-from izen.prettify import ColorPrint
+from ihelp import helper
+from ipretty import R, B, G, ColorPrint
 
 
 class SongMetas(object):

@@ -10,7 +10,7 @@ import sys
 app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
-from izen.crawler import UA, ParseHeaderFromFile
+from icraw import UA, ParseHeaderFromFile
 
 __general_post_header__ = {
     'User-Agent': UA.mac_safari__,

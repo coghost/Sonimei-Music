@@ -1,10 +1,8 @@
 # -*- coding: utf-8 -*-
-from izen.prettify import ColorPrint, Prettify
-from sonimei.icfg import cfg
+__VERSION__ = '0.1.8.2'
 
-__VERSION__ = '0.1.8.1'
-
-IS_PROD = False
+from ipretty import ColorPrint, Prettify
+from sonimei._cfg import cfg
 
 PRETTY = Prettify(cfg)
 CP = ColorPrint()

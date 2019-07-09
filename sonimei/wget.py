@@ -15,7 +15,7 @@ else:
     import urllib as ulib
     import urlparse
 
-from sonimei.icfg import cfg
+from sonimei._cfg import cfg
 
 
 # --- helpers ---

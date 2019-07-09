@@ -13,18 +13,19 @@ app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
 from logzero import logger as zlog
-from izen import helper
-from izen.prettify import ColorPrint, Prettify
+from ihelp import helper
+from ipretty import ColorPrint, Prettify
+import ipretty
 
 from sonimei.metas import SongMetas
-from sonimei.icfg import cfg
+from sonimei._cfg import cfg
 from sonimei.zutil import error_hint, headless_driver
 from sonimei import wget
 
 PRETTY = Prettify(cfg)
 CP = ColorPrint()
 
-from izen.crawler import AsyncCrawler
+from icraw import AsyncCrawler
 from sonimei.site_header import NeteaseHeaders, QQHeaders, KugouHeaders
 
 
@@ -55,7 +56,7 @@ class MusicStore(object):
             song_ = '.'.join(song.split('.')[:-1])
             candidates = [song_, *song_.split('-')]
             if song_name in '#'.join(candidates):
-                similar.append('{}{}'.format(song, helper.Y.format(' ({}M)').format(self.get_size(song))))
+                similar.append('{}{}'.format(song, ipretty.Y.format(' ({}M)').format(self.get_size(song))))
 
         return similar
 
@@ -112,14 +113,14 @@ class Downloader(object):
             zlog.info('{} is downloaded.'.format(save_to))
             return save_to
         if self._override and helper.is_file_ok(save_to):
-            zlog.info('force remove exist file: ({})'.format(helper.C.format(save_to)))
+            zlog.info('force remove exist file: ({})'.format(ipretty.C.format(save_to)))
             os.remove(save_to)
         zlog.debug('try get {}'.format(save_to))
         try:
             wget.download(src, out=save_to)
             # wget output end without new line
             print()
-            zlog.info('downloaded {}'.format(helper.G.format(save_to.split('/')[-1])))
+            zlog.info('downloaded {}'.format(ipretty.G.format(save_to.split('/')[-1])))
             return save_to
         except Exception as e:
             zlog.error('Download {}({}) Failed: {}'.format(save_to.split('/')[-1], src, e))

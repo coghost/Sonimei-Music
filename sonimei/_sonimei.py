@@ -12,14 +12,15 @@ sys.path.append(app_root)
 
 from requests.exceptions import ConnectionError, ConnectTimeout, ReadTimeout
 from logzero import logger as zlog
-from izen.crawler import AsyncCrawler
-from izen import helper
+from icraw.crawler import AsyncCrawler
+from ihelp import helper
+import ipretty
 import yaml
 import click
 import psutil
 
 from sonimei.__const__ import CP, HIGH_Q
-from sonimei.icfg import cfg
+from sonimei._cfg import cfg
 from sonimei.site_header import SonimeiHeaders
 from sonimei.sites import Downloader, MusicStore
 from sonimei.sites import MockAlbum, QQAlbum, NeteaseAlbum, KugouAlbum
@@ -179,7 +180,7 @@ def check_failure(failure_songs):
     for i, s in enumerate(dat):
         CP.Y('{}. {}'.format(i + 1, s))
         scanned_songs.append(s)
-    ch = click.confirm(helper.C.format('do you want continue with downloading all failure songs...'), default=True)
+    ch = click.confirm(ipretty.C.format('do you want continue with downloading all failure songs...'), default=True)
     if not ch:
         os._exit(0)
     return scanned_songs
@@ -202,7 +203,7 @@ def check_player(auto_mode):
 def check_spotify_playing():
     st = SpotifyTrack()
     CP.G('current playing  : [{}]'.format(
-        helper.Y.format('{artist} - {name}'.format(**st.track))))
+        ipretty.Y.format('{artist} - {name}'.format(**st.track))))
     if st.track:
         return False, ['{artist} - {name}'.format(**st.track)]
 
@@ -215,7 +216,7 @@ def check_neteasemusic_playing():
 
     song_info = '{}-{}'.format(song['author'], song['title'])
     CP.G('current playing:  {}'.format(
-        helper.Y.format(
+        ipretty.Y.format(
             '{}({}M/{}bits)'.format(
                 song_info,
                 round(int(song['fileSize']) / (1024.0 * 1024.0), 2),
@@ -224,7 +225,7 @@ def check_neteasemusic_playing():
     scanned_songs = [song_info]
     if int(song['bitrate']) >= HIGH_Q:
         # if bitrate >= 320, we will force use it
-        choice = click.confirm(helper.C.format('high quality song got, force use NeteaseMusic/163 Source ?'),
+        choice = click.confirm(ipretty.C.format('high quality song got, force use NeteaseMusic/163 Source ?'),
                                default=True)
     return choice, scanned_songs
 

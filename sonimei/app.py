@@ -11,9 +11,11 @@ app_root = '/'.join(os.path.abspath(__file__).split('/')[:-2])
 sys.path.append(app_root)
 
 import click
-from izen import helper
+from ihelp import helper
+import ipretty
+
 from sonimei.__const__ import CP, PRETTY, __VERSION__, SITES
-from sonimei.icfg import cfg, zlog
+from sonimei._cfg import cfg, zlog
 from sonimei.zutil import fmt_help, error_hint
 from sonimei._sonimei import Sonimei, NeteaseDL, check_player, check_failure, check_local, FailureHandle
 
@@ -66,7 +68,7 @@ def print_version(ctx, param, value):
               help=fmt_help('scan all songs and add id3 info', '-scan'))
 @click.option('--timeout', '-to', type=int,
               help=fmt_help('default timeout', '-to'))
-@click.option('--version', is_flag=True, callback=print_version,
+@click.option('--version', '-V', is_flag=True, callback=print_version,
               expose_value=False, is_eager=True)
 def run(
         name, site, multiple, no_cache, log_level,
@@ -130,7 +132,7 @@ def run(
 
             songs = songs_store.get(page)
             if not songs:
-                zlog.info('from sonimei({}) try: {}/{}'.format(helper.G.format(site), name, page))
+                zlog.info('from sonimei({}) try: {}/{}'.format(ipretty.G.format(site), name, page))
                 songs = _client.search_it(name, page=page)
                 if not isinstance(songs, list):
                     songs = [songs]

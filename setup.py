@@ -22,8 +22,9 @@ setup(
     long_description_content_type="text/markdown",
     license='GPL',
     install_requires=[
-        'wget', 'izen', 'click', 'logzero', 'mutagen', 'lxml', 'requests', 'selenium', 'PyYAML', 'psutil', 'decorator',
-        'sh'
+        'wget', 'click', 'logzero', 'mutagen', 'lxml',
+        'requests', 'selenium', 'PyYAML', 'psutil', 'decorator',
+        'sh', 'ipretty', 'ihelp', 'icraw', 'icfg'
     ],
     entry_points={
         'console_scripts': [
