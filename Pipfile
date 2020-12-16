@@ -16,9 +16,11 @@ ihelp = "*"
 icfg = {editable = true,path = "/Users/lihe/00Li/github/iz/icfg"}
 ipretty = {editable = true,path = "/Users/lihe/00Li/github/iz/ipretty"}
 icraw = {editable = true,path = "/Users/lihe/00Li/github/iz/icraw"}
+profig = "*"
+tqdm = "*"
 
 [dev-packages]
 twine = "*"
 
 [requires]
-python_version = "3.7"
+python_version = "3.8"
